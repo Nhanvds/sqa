@@ -1,0 +1,14 @@
+{
+  "root": true,
+  "extends": [
+    "next/core-web-vitals", "next/typescript",
+    "eslint:recommended",
+    "plugin:unicorn/recommended",
+    "plugin:sonarjs/recommended"
+  ],
+  "plugins": ["unicorn", "sonarjs"],
+  "rules": {
+    "unicorn/no-array-callback-reference": "warn",
+    "unicorn/no-zero-fractions": "warn"
+  }
+}

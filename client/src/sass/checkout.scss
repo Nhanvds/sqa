@@ -1,0 +1,52 @@
+
+.checkout-container {
+    padding: 24px;
+
+    .order-items {
+        .item-card {
+            display: flex;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+
+            .item-image {
+                margin-right: 16px;
+            }
+
+            .item-details {
+                flex: 1;
+
+                .item-name {
+                    margin-bottom: 8px;
+                }
+
+                .item-price {
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 8px;
+
+                    .discounted-price {
+                        color: #ff4d4f;
+                        font-weight: 600;
+                    }
+
+                    .original-price {
+                        color: #999;
+                    }
+                }
+            }
+
+            .item-total {
+                text-align: right;
+                min-width: 100px;
+            }
+        }
+    }
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}

@@ -1,0 +1,57 @@
+
+.review-modal {
+    .ant-modal-content {
+        border-radius: 8px;
+        padding: 16px;
+    }
+
+    .ant-modal-header {
+        border-bottom: none;
+    }
+
+    .ant-modal-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+
+    .ant-modal-close-x {
+        font-size: 1.2rem;
+    }
+}
+
+.review-form {
+    .ant-form-item {
+        margin-bottom: 16px;
+    }
+
+    .ant-rate {
+        font-size: 1.5rem;
+    }
+
+    .submit-review-button {
+        width: 100%;
+        background-color: #1890ff;
+        border-color: #1890ff;
+
+        &:hover {
+            background-color: #40a9ff;
+            border-color: #40a9ff;
+        }
+    }
+}
+
+@media (max-width: 768px) {
+    .review-modal {
+        .ant-modal-content {
+            padding: 12px;
+        }
+
+        .ant-modal-title {
+            font-size: 1.2rem;
+        }
+    }
+
+    .submit-review-button {
+        font-size: 0.9rem;
+    }
+}

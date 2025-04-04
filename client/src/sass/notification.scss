@@ -1,0 +1,24 @@
+.notification-progress {
+  position: relative;
+  overflow: hidden;
+}
+
+.notification-progress::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background-color: currentColor;
+  animation: progress-bar linear forwards;
+}
+
+@keyframes progress-bar {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0;
+  }
+}
