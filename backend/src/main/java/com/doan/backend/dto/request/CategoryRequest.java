@@ -4,6 +4,7 @@ import com.doan.backend.enums.StatusEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
@@ -13,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Data
 @Builder
+@AllArgsConstructor
 public class CategoryRequest {
 
     @NotBlank(message = "Name is required")
