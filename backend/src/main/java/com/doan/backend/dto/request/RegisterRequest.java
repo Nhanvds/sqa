@@ -5,18 +5,19 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.Set;
 
 @Validated
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@FieldDefaults(level = AccessLevel.PUBLIC)
 @Data
 @Builder
+@AllArgsConstructor // Explicitly generate a public all-args constructor
+@NoArgsConstructor
 public class RegisterRequest {
 
     @Email(message = "Email is invalid")
