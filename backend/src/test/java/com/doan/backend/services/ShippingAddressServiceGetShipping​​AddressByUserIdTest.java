@@ -1,11 +1,10 @@
-package com.doan.backend.test;
+package com.doan.backend.services;
 
 import com.doan.backend.dto.response.ApiResponse;
 import com.doan.backend.dto.response.ShippingAddressResponse;
 import com.doan.backend.entity.ShippingAddress;
 import com.doan.backend.mapper.ShippingAddressMapper;
 import com.doan.backend.repositories.ShippingAddressRepository;
-import com.doan.backend.services.ShippingAddressService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

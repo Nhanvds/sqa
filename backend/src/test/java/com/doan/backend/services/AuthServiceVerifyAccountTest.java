@@ -1,10 +1,9 @@
-package com.doan.backend.test;  // Đổi package thành com.doan.backend.test
+package com.doan.backend.services;
 
 import com.doan.backend.dto.response.ApiResponse;
 import com.doan.backend.entity.User;
 import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.repositories.UserRepository;
-import com.doan.backend.services.AuthService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

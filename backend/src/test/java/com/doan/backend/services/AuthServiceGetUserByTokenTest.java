@@ -1,9 +1,8 @@
-package com.doan.backend.test;
+package com.doan.backend.services;
 
 import com.doan.backend.entity.User;
 import com.doan.backend.exception.Unauthorized;
 import com.doan.backend.repositories.UserRepository;
-import com.doan.backend.services.AuthService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

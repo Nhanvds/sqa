@@ -1,4 +1,4 @@
-package com.doan.backend.test;
+package com.doan.backend.services;
 
 import com.doan.backend.dto.response.ApiResponse;
 import com.doan.backend.dto.response.UserResponse;
@@ -6,7 +6,6 @@ import com.doan.backend.entity.User;
 import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.mapper.UserMapper;
 import com.doan.backend.repositories.UserRepository;
-import com.doan.backend.services.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,7 +17,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Collections;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
