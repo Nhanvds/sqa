@@ -2,12 +2,11 @@ package com.doan.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.validation.annotation.Validated;
-
+@NoArgsConstructor
+@AllArgsConstructor
 @Validated
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Data

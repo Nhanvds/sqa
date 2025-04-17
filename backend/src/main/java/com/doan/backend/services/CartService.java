@@ -51,7 +51,7 @@ public class CartService {
         }
     }
 
-    private ProductInventory validateProductInventory(CartItemRequest cartItemRequest) {
+    public ProductInventory validateProductInventory(CartItemRequest cartItemRequest) {
         ProductInventory productInventory = productInventoryRepository.findByProductIdAndSizeId(
                         cartItemRequest.getProductId(), cartItemRequest.getSizeId())
                 .orElseThrow(() -> new RuntimeException("Product inventory not found"));
@@ -113,4 +113,5 @@ public class CartService {
         cartResponse.setCartItems(Collections.emptyList());
         return cartResponse;
     }
+
 }
