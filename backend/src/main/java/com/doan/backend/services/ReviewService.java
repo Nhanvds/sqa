@@ -12,6 +12,7 @@ import com.doan.backend.repositories.OrderRepository;
 import com.doan.backend.repositories.ProductRepository;
 import com.doan.backend.repositories.ReviewRepository;
 import com.doan.backend.repositories.UserRepository;
+import io.jsonwebtoken.lang.Assert;
 import lombok.AllArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class ReviewService {
     public ApiResponse<ReviewResponse> createReview(ReviewRequest reviewRequest) {
         User user = authService.getUserByToken();
         Product product = productRepository.findById(reviewRequest.getProductId()).orElseThrow(() -> new RuntimeException("Product not found"));
+        Assert.isNull(user);
         Order order = orderRepository.findById(reviewRequest.getOrderId()).orElseThrow(() -> new RuntimeException("Order not found"));
 
         if (!order.getUser().getId().equals(user.getId())) {
