@@ -23,7 +23,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 
 @ExtendWith(MockitoExtension.class)
-public class ImageServiceTest {
+public class TestImageService {
 
     @Mock private Cloudinary cloudinary;
     @Mock private Uploader uploader;

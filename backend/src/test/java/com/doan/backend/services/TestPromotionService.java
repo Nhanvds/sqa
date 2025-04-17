@@ -23,7 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 
 @ExtendWith(MockitoExtension.class)
-public class PromotionServiceTest {
+public class TestPromotionService {
 
     @Mock
     private PromotionRepository promotionRepository;

@@ -3,7 +3,6 @@ package com.doan.backend.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +26,7 @@ import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-public class ReviewServiceTest {
+public class TestReviewService {
 
     @Mock private ReviewRepository reviewRepository;
     @Mock private ProductRepository productRepository;

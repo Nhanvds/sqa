@@ -3,7 +3,6 @@ package com.doan.backend.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -22,10 +21,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.*;
 
 @ExtendWith(MockitoExtension.class)
-public class RevenueServiceTest {
+public class TestRevenueService {
 
     @Mock
     private OrderItemRepository orderItemRepository;

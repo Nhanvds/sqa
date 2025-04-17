@@ -2,7 +2,6 @@ package com.doan.backend.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,7 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 
 @ExtendWith(MockitoExtension.class)
-public class DiscountServiceTest {
+public class TestDiscountService {
 
     // Mô phỏng các dependency cần thiết để test service
     @Mock
