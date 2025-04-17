@@ -22,4 +22,5 @@ public class CategoryRequest {
     String description;
     @NotNull(message = "Status is required")
     StatusEnum status;
+
 }
