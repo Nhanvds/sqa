@@ -9,10 +9,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface OrderRepository extends JpaRepository<Order, String> {
     Iterable<Order> findByUserId(String userId);
-
+    Optional<Order> findByIdAndUserId(String id, String userId);
     Iterable<Order> findByStatus(OrderStatusEnum status);
 
     Iterable<Order> findByUserIdAndStatus(String userId, OrderStatusEnum status);

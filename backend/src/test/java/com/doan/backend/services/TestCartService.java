@@ -261,16 +261,29 @@ public class TestCartService {
         // Arrange
         String userId = "user123";
 
+        // Mock user (vì createCart cần user)
+        User user = new User();
+        user.setId(userId);
+
         // Giả lập trường hợp không có giỏ hàng với userId này
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-        // Giả lập việc tạo giỏ hàng mới
+        // Mock userRepository.findById
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // Mock tạo cart mới
         Cart newCart = new Cart();
-        newCart.setId("cart123"); // giả lập ID mới cho cart
+        newCart.setId("cart123");
+        newCart.setUser(user);
+
+        // Khi save Cart, trả về newCart
+        when(cartRepository.save(any(Cart.class))).thenReturn(newCart);
+
+        // CartResponse giả
         CartResponse newCartResponse = new CartResponse();
         newCartResponse.setId("cart123");
 
-        // Giả lập tạo giỏ hàng mới trong hệ thống (createCart)
+        // Mock cartMapper
         when(cartMapper.toCartResponse(newCart)).thenReturn(newCartResponse);
 
         // Act
@@ -284,11 +297,12 @@ public class TestCartService {
         assertThat(actualResponse.getResult().getId()).isEqualTo("cart123");
         assertThat(actualResponse.getResult().getCartItems()).isNullOrEmpty(); // Giỏ hàng mới tạo sẽ không có items
 
-        // Verify that methods were called correctly
+        // Verify behavior
         verify(cartRepository, times(1)).findByUserId(userId);
+        verify(userRepository, times(1)).findById(userId);
+        verify(cartRepository, times(1)).save(any(Cart.class));
         verify(cartMapper, times(1)).toCartResponse(newCart);
     }
-
     @Test
     @DisplayName("TC_CART_UPDATE_01 - Cập nhật cart item thành công (cartItemId hợp lệ + CartItemRequest hợp lệ)")
     void testUpdateCartItem_Success() {
@@ -319,7 +333,10 @@ public class TestCartService {
         cartItemResponse.setId(cartItemId);
 
         // Mock behavior
-        when(cartService.validateProductInventory(cartItemRequest)).thenReturn(productInventory);
+        when(productInventoryRepository.findByProductIdAndSizeId(
+                cartItemRequest.getProductId(),
+                cartItemRequest.getSizeId()
+        )).thenReturn(Optional.of(productInventory));
         when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.of(existingCartItem));
         when(cartItemRepository.save(existingCartItem)).thenReturn(updatedCartItem);
         when(cartItemMapper.toCartItemResponse(updatedCartItem)).thenReturn(cartItemResponse);
@@ -359,7 +376,10 @@ public class TestCartService {
         productInventory.setSize(size);
 
         // Mock behavior
-        when(cartService.validateProductInventory(cartItemRequest)).thenReturn(productInventory);
+        when(productInventoryRepository.findByProductIdAndSizeId(
+                cartItemRequest.getProductId(),
+                cartItemRequest.getSizeId()
+        )).thenReturn(Optional.of(productInventory));
         when(cartItemRepository.findById(cartItemId)).thenReturn(Optional.empty()); // không tìm thấy
 
         // Act & Assert
@@ -387,9 +407,11 @@ public class TestCartService {
         cartItemRequest.setSizeId("nonExistingSizeId");
         cartItemRequest.setQuantity(2);
 
-        // Mock behavior
-        when(cartService.validateProductInventory(cartItemRequest))
-                .thenThrow(new RuntimeException("Product inventory not found"));
+        // Mock productInventoryRepository để validateProductInventory() ném lỗi
+        when(productInventoryRepository.findByProductIdAndSizeId(
+                cartItemRequest.getProductId(),
+                cartItemRequest.getSizeId()))
+                .thenReturn(Optional.empty());
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
@@ -399,11 +421,13 @@ public class TestCartService {
         assertThat(exception.getMessage()).isEqualTo("Product inventory not found");
 
         // Verify behavior
-        verify(cartService, times(1)).validateProductInventory(cartItemRequest);
+        verify(productInventoryRepository, times(1))
+                .findByProductIdAndSizeId(cartItemRequest.getProductId(), cartItemRequest.getSizeId());
         verify(cartItemRepository, never()).findById(any());
         verify(cartItemRepository, never()).save(any());
         verify(cartItemMapper, never()).toCartItemResponse(any());
     }
+
 
     @Test
     @DisplayName("TC_CART_DELETE_01 - Xóa cart item thành công (cartItemId hợp lệ)")

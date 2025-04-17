@@ -14,6 +14,7 @@ import com.doan.backend.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -54,6 +55,7 @@ public class TestOrderService {
     @Mock private PaymentService paymentService;
     @Mock private UserDiscountRepository userDiscountRepository;
 
+    @InjectMocks
     private OrderService orderService;
     private String userId;
     private String orderId;
@@ -65,11 +67,6 @@ public class TestOrderService {
 
     @BeforeEach
     void setUp() {
-        // Khởi tạo OrderService với các mock repository
-        orderService = new OrderService(orderRepository, orderItemRepository, cartRepository,
-                cartItemRepository, productInventoryRepository, orderMapper, discountRepository,
-                shippingAddressRepository, promotionProductRepository, promotionService,
-                invoiceRepository, paymentRepository, paymentService, userDiscountRepository);
         MockitoAnnotations.openMocks(this);
 
         userId = "user123";
@@ -162,34 +159,29 @@ public class TestOrderService {
         String productId = "product123";
         String sizeId = "size123";
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
 
-        // Tạo Cart giả và CartItem
         Cart cart = new Cart();
-        cart.setUser(new User()); // Giả sử User có sẵn trong hệ thống, hoặc mock nếu cần
-        cart.setId("cart123"); // ID giỏ hàng giả định
+        cart.setUser(new User());
+        cart.setId("cart123");
 
         Product product = new Product();
-        product.setId(productId);  // ID sản phẩm giả định
+        product.setId(productId);
         Size size = new Size();
-        size.setId(sizeId);        // ID kích thước giả định
+        size.setId(sizeId);
 
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
         cartItem.setSize(size);
-        cartItem.setQuantity(2); // Giả sử giỏ hàng có 2 sản phẩm
-        cartItem.setCart(cart); // Liên kết CartItem với Cart
+        cartItem.setQuantity(2);
+        cartItem.setCart(cart); // liên kết cartItem với cart
 
-        // Mock cartRepository để trả về cart tồn tại
+//        cart.setCartItems(List.of(cartItem));
+
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-
-        // Mock shippingAddressRepository trả về địa chỉ tồn tại
         when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
-
-        // Mock productInventoryRepository trả về Optional.empty(), mô phỏng productInventory không tồn tại
         when(productInventoryRepository.findByProductIdAndSizeId(productId, sizeId)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -197,14 +189,13 @@ public class TestOrderService {
             orderService.createOrderFromCart(orderRequest);
         });
 
-        // Kiểm tra thông báo lỗi là "Product inventory not found"
         assertThat(thrown.getMessage()).isEqualTo("Product inventory not found");
 
-        // Verify behavior
         verify(cartRepository, times(1)).findByUserId(userId);
         verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
         verify(productInventoryRepository, times(1)).findByProductIdAndSizeId(productId, sizeId);
     }
+
 
 
 
@@ -466,6 +457,7 @@ public class TestOrderService {
     }
 
 
+
     @Test
     @DisplayName("TC_ORDER_009 - Tổng tiền sau discount âm (cartTotal - discountAmount < 0)")
     void testCreateOrderFromCart_TotalAfterDiscountNegative() {
@@ -495,6 +487,7 @@ public class TestOrderService {
         cartItem.setProduct(product);
         cartItem.setQuantity(requestedQuantity);
 
+        // Mock CartRepository
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
         when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
         when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
@@ -514,7 +507,7 @@ public class TestOrderService {
 
         // Assert
         assertThat(orderResponse.getTotalPriceBeforeDiscount()).isEqualTo(cartTotal);
-        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(BigDecimal.ZERO);
+        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(BigDecimal.ZERO); // Sau giảm giá âm => 0
 
         // Verify
         verify(cartRepository, times(1)).findByUserId(userId);
@@ -522,6 +515,7 @@ public class TestOrderService {
         verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
         verify(discountRepository, times(1)).findById(discountId);
     }
+
 
 
     @Test
@@ -552,8 +546,11 @@ public class TestOrderService {
         cartItem.setProduct(product);
         cartItem.setQuantity(requestedQuantity);
 
+        // Mock cartRepository trả về giỏ hàng hợp lệ
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        // Mock cartItemRepository trả về danh sách các item trong giỏ hàng
         when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        // Mock shippingAddressRepository trả về địa chỉ giao hàng hợp lệ
         when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
 
         // Act
@@ -571,6 +568,7 @@ public class TestOrderService {
         verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
         verifyNoInteractions(discountRepository); // Không gọi đến discountRepository
     }
+
 
     @Test
     @DisplayName("TC_ORDER_011 - Điều kiện hợp lệ, có discount (Cart hợp lệ + discountId hợp lệ)")
@@ -657,15 +655,16 @@ public class TestOrderService {
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.clientEditOrder(request);
+            orderService.clientEditOrder(request);  // Đảm bảo đây thực sự gọi findById
         });
 
         // Verify exception message
         assertThat(exception.getMessage()).isEqualTo("Order not found");
 
         // Verify repository call
-        verify(orderRepository, times(1)).findById(invalidOrderId);
+        verify(orderRepository, times(1)).findById(invalidOrderId); // Kiểm tra xem findById có được gọi không
     }
+
 
     @Test
     @DisplayName("TC_ORDER_013 - User không phải chủ đơn - Báo lỗi 'You do not have permission to edit this order'")
@@ -695,10 +694,13 @@ public class TestOrderService {
             orderService.clientEditOrder(request);
         });
 
+        // Kiểm tra thông báo lỗi là "You do not have permission to edit this order"
         assertThat(exception.getMessage()).isEqualTo("You do not have permission to edit this order");
 
+        // Verify behavior
         verify(orderRepository, times(1)).findById(orderId);
     }
+
 
     @Test
     @DisplayName("TC_ORDER_014 - Đơn không ở trạng thái Pending - Báo lỗi 'Order cannot be edited at this stage'")
@@ -728,10 +730,13 @@ public class TestOrderService {
             orderService.clientEditOrder(request);
         });
 
+        // Kiểm tra thông báo lỗi là "Order cannot be edited at this stage"
         assertThat(exception.getMessage()).isEqualTo("Order cannot be edited at this stage");
 
+        // Verify behavior
         verify(orderRepository, times(1)).findById(orderId);
     }
+
 
     @Test
     @DisplayName("TC_ORDER_015 - Địa chỉ giao hàng mới không tồn tại - Báo lỗi 'Shipping address not found'")
@@ -739,26 +744,24 @@ public class TestOrderService {
         // Arrange
         String orderId = "order123";
         String userId = "user123";
-        String invalidShippingAddressId = "invalidAddressId"; // Địa chỉ không tồn tại
+        String invalidShippingAddressId = "invalidAddressId";
 
         UpdateOrderRequest request = new UpdateOrderRequest();
         request.setOrderId(orderId);
         request.setUserId(userId);
-        request.setShippingAddressId(invalidShippingAddressId);  // Địa chỉ mới không hợp lệ
+        request.setShippingAddressId(invalidShippingAddressId);
 
-        // Tạo User và Order hợp lệ
         User user = new User();
         user.setId(userId);
 
         Order order = new Order();
         order.setId(orderId);
         order.setUser(user);
-        order.setStatus(OrderStatusEnum.PENDING);  // Trạng thái đơn hợp lệ để chỉnh sửa
+        order.setStatus(OrderStatusEnum.PENDING);
 
-        // Mock orderRepository trả về order
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        // ⚡ Fix mock chỗ này:
+        when(orderRepository.findByIdAndUserId(orderId, userId)).thenReturn(Optional.of(order));
 
-        // Mock shippingAddressRepository trả về null khi tìm kiếm địa chỉ
         when(shippingAddressRepository.findById(invalidShippingAddressId)).thenReturn(Optional.empty());
 
         // Act & Assert
@@ -768,9 +771,10 @@ public class TestOrderService {
 
         assertThat(exception.getMessage()).isEqualTo("Shipping address not found");
 
-        verify(orderRepository, times(1)).findById(orderId);
+        verify(orderRepository, times(1)).findByIdAndUserId(orderId, userId);
         verify(shippingAddressRepository, times(1)).findById(invalidShippingAddressId);
     }
+
 
     @Test
     @DisplayName("TC_ORDER_016 - Cập nhật địa chỉ giao hàng hợp lệ - Cập nhật thành công")
@@ -869,6 +873,7 @@ public class TestOrderService {
         verify(orderRepository, times(1)).findById(orderId);
         verify(shippingAddressRepository, times(1)).findById("invalidAddressId");
     }
+
     @Test
     @DisplayName("TC_ORDER_019 - Cập nhật trạng thái và địa chỉ hợp lệ - Cập nhật thành công")
     void testAdminEditOrder_UpdateStatusAndShippingAddressSuccess() {
@@ -951,8 +956,24 @@ public class TestOrderService {
     void GetOrdersForAdmin_ValidOrders() {
         // Arrange: Khi có danh sách đơn hàng cho các bộ lọc
         Pageable pageable = mock(Pageable.class);
+
+        // Tạo một danh sách đơn hàng giả để trả về
+        Order order = new Order();
+        order.setId("order123");
+        order.setStatus(OrderStatusEnum.PENDING);
+
+        Order orderEntity = new Order();
+        orderEntity.setId("order123");
+
+        // Tạo một Page chứa các OrderResponse
+        Page<Order> orderPage = new PageImpl<>(Collections.singletonList(orderEntity));
+
+        // Mock orderRepository trả về Page giả
         when(orderRepository.findOrdersForAdmin(anyString(), anyString(), any(), eq(pageable)))
                 .thenReturn(orderPage);
+        OrderResponse orderResponse = new OrderResponse();
+        orderResponse.setId("order123");
+        // Mock orderMapper
         when(orderMapper.toOrderResponse(order)).thenReturn(orderResponse);
 
         // Act: Gọi phương thức getOrdersForAdmin
@@ -963,8 +984,9 @@ public class TestOrderService {
         assertEquals(200, response.getCode());
         assertEquals("Orders retrieved successfully", response.getMessage());
         assertEquals(1, response.getResult().getContent().size());
-        assertEquals(orderId, response.getResult().getContent().get(0).getId());
+        assertEquals("order123", response.getResult().getContent().get(0).getId());
     }
+
 
 
 }

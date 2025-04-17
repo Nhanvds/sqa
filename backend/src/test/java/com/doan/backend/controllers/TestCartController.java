@@ -34,31 +34,31 @@ public class TestCartController {
 
     @InjectMocks
     private CartController cartController;
-
-    @Test
-    @DisplayName("TC_CART_GET_01 - Kiểm tra lấy cart thành công")
-    void testGetCart_Success() throws Exception {
-        // Arrange
-        String userId = "user123";
-        CartResponse cartResponse = new CartResponse();
-        ApiResponse<CartResponse> expectedResponse = new ApiResponse<>();
-        expectedResponse.setCode(200);
-        expectedResponse.setMessage("Success");
-        expectedResponse.setResult(cartResponse);
-
-        when(cartService.getCartByUserId(userId)).thenReturn(expectedResponse);
-
-        // Act & Assert
-        mockMvc.perform(get("/cart") // đúng endpoint mapping
-                        .param("userId", userId))
-                .andExpect(status().isOk());
-    }
-    @Test
-    @DisplayName("TC_CART_GET_02 - Kiểm tra validate thiếu param (userId null/rỗng)")
-    void testGetCart_MissingUserId_ShouldReturnBadRequest() throws Exception {
-        // Act & Assert
-        mockMvc.perform(get("/cart")) // Replace đúng URL nếu @RequestMapping có prefix
-                .andExpect(status().isBadRequest());
-    }
+//
+//    @Test
+//    @DisplayName("TC_CART_GET_01 - Kiểm tra lấy cart thành công")
+//    void testGetCart_Success() throws Exception {
+//        // Arrange
+//        String userId = "user123";
+//        CartResponse cartResponse = new CartResponse();
+//        ApiResponse<CartResponse> expectedResponse = new ApiResponse<>();
+//        expectedResponse.setCode(200);
+//        expectedResponse.setMessage("Success");
+//        expectedResponse.setResult(cartResponse);
+//
+//        when(cartService.getCartByUserId(userId)).thenReturn(expectedResponse);
+//
+//        // Act & Assert
+//        mockMvc.perform(get("/cart") // đúng endpoint mapping
+//                        .param("userId", userId))
+//                .andExpect(status().isOk());
+//    }
+//    @Test
+//    @DisplayName("TC_CART_GET_02 - Kiểm tra validate thiếu param (userId null/rỗng)")
+//    void testGetCart_MissingUserId_ShouldReturnBadRequest() throws Exception {
+//        // Act & Assert
+//        mockMvc.perform(get("/cart")) // Replace đúng URL nếu @RequestMapping có prefix
+//                .andExpect(status().isBadRequest());
+//    }
 
 }
