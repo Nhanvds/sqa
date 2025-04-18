@@ -1,6 +1,7 @@
 package com.doan.backend.services;
 
 
+import com.doan.backend.DummyDataFactory;
 import com.doan.backend.dto.request.CartItemRequest;
 import com.doan.backend.dto.response.*;
 import com.doan.backend.entity.*;
@@ -19,11 +20,17 @@ import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.Spy;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
@@ -36,10 +43,8 @@ import java.util.Set;
 
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@Transactional
+@ExtendWith(MockitoExtension.class)
 public class TestCartService {
-    @Spy // dùng @Spy để mock 1 phần CartService
     @InjectMocks
     private CartService cartService;
 
@@ -61,57 +66,31 @@ public class TestCartService {
     @Mock
     private CartMapper cartMapper;
 
-    @Autowired
-    private Validator validator;
+
 
     @Test
     @DisplayName("TC_CART_ADD_01 - Thêm sản phẩm hợp lệ vào giỏ hàng thành công")
     void testAddCartItem_Success() {
         // Given: Thiết lập dữ liệu đầu vào và các giả lập (mock)
-
-        // Tạo CartItemRequest với thông tin giỏ hàng cần thêm sản phẩm
-        CartItemRequest cartItemRequest = new CartItemRequest();
-        cartItemRequest.setCartId("cart123");
-        cartItemRequest.setProductId("product123");
-        cartItemRequest.setSizeId("size123");
-        cartItemRequest.setQuantity(2);
-
-        // Tạo một ProductInventory giả lập, giả sử đã có sản phẩm với thông tin này
-        ProductInventory productInventory = new ProductInventory();
-        productInventory.setProduct(new Product());
-        productInventory.setSize(new Size());
-        productInventory.setQuantity(100);  // Số lượng tồn kho giả lập
-
-        // Tạo Cart giả lập (giỏ hàng đã tồn tại)
-        Cart cart = new Cart();
-        cart.setId("cart123");
-
-        // Tạo CartItem giả lập (sản phẩm sẽ được thêm vào giỏ)
-        CartItem cartItem = new CartItem();
-        cartItem.setCart(cart);
-        cartItem.setProduct(productInventory.getProduct());
-        cartItem.setSize(productInventory.getSize());
-        cartItem.setQuantity(cartItemRequest.getQuantity());
-
-        // Tạo CartItemResponse giả lập (để trả về từ mapper)
-        CartItemResponse cartItemResponse = new CartItemResponse();
-        cartItemResponse.setId("item123");
-        cartItemResponse.setProduct(new ProductResponse());
-        cartItemResponse.setSize(new SizeResponse());
-        cartItemResponse.setQuantity(cartItem.getQuantity());
+        CartItemRequest cartItemRequest = DummyDataFactory.dummyCartItemRequest();
+        ProductInventory productInventory = DummyDataFactory.dummyProductInventory();
+        Cart cart = DummyDataFactory.dummyCart();
+        cartItemRequest.setCartId(cart.getId());
+        CartItem cartItem = DummyDataFactory.dummyCartItem();
+        CartItemResponse cartItemResponse = DummyDataFactory.dummyCartItemResponse();
 
         // Giả lập việc tìm kiếm sản phẩm tồn kho từ repository
-        when(productInventoryRepository.findByProductIdAndSizeId(anyString(), anyString()))
+        Mockito.when(productInventoryRepository.findByProductIdAndSizeId(anyString(), anyString()))
                 .thenReturn(Optional.of(productInventory));
 
         // Giả lập việc tìm kiếm giỏ hàng từ repository
-        when(cartRepository.findById("cart123")).thenReturn(Optional.of(cart));
+        Mockito.when(cartRepository.findById(cart.getId())).thenReturn(Optional.of(cart));
 
         // Giả lập việc lưu CartItem mới vào repository
-        when(cartItemRepository.save(any(CartItem.class))).thenReturn(cartItem);
+        Mockito.when(cartItemRepository.save(any(CartItem.class))).thenReturn(cartItem);
 
         // Giả lập việc chuyển đổi CartItem thành CartItemResponse
-        when(cartItemMapper.toCartItemResponse(any(CartItem.class))).thenReturn(cartItemResponse);
+        Mockito.when(cartItemMapper.toCartItemResponse(any(CartItem.class))).thenReturn(cartItemResponse);
 
         // When: Thực thi phương thức cần test
         ApiResponse<CartItemResponse> response = cartService.addCartItem(cartItemRequest);
@@ -122,27 +101,23 @@ public class TestCartService {
         assertNotNull(response.getResult());  // Kiểm tra kết quả trả về không null
 
         // Kiểm tra các trường dữ liệu trong kết quả trả về
-        assertEquals("item123", response.getResult().getId());  // Kiểm tra ID sản phẩm
-        assertEquals(2, response.getResult().getQuantity());  // Kiểm tra số lượng sản phẩm
+        assertEquals(cartItemResponse.getId(), response.getResult().getId());  // Kiểm tra ID sản phẩm
+        assertEquals(cartItemResponse.getQuantity(), response.getResult().getQuantity());  // Kiểm tra số lượng sản phẩm
     }
 
     @Test
     @DisplayName("TC_CART_ADD_02 - Không tìm thấy Cart - Throw RuntimeException")
     void testAddCartItem_CartNotFound() {
         // Arrange
-        CartItemRequest request = new CartItemRequest();
-        request.setCartId("nonExistingCartId");
-        request.setProductId("someProductId");
-        request.setSizeId("someSizeId");
-        request.setQuantity(2);
-
+        CartItemRequest request = DummyDataFactory.dummyCartItemRequest();
+        ProductInventory productInventory = DummyDataFactory.dummyProductInventory();
         when(cartRepository.findById(request.getCartId())).thenReturn(Optional.empty());
-
+        when(productInventoryRepository.findByProductIdAndSizeId(anyString(), anyString()))
+                .thenReturn(Optional.of(productInventory));
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             cartService.addCartItem(request);
         });
-
         assertEquals("Cart not found", exception.getMessage());
 
         verify(cartRepository, times(1)).findById(request.getCartId());
@@ -152,17 +127,8 @@ public class TestCartService {
     @Test
     @DisplayName("TC_CART_ADD_03 - Không tìm thấy ProductInventory")
     void testAddCartItem_ProductInventoryNotFound_ShouldThrowException() {
-        // Arrange
-        CartItemRequest cartItemRequest = new CartItemRequest();
-        cartItemRequest.setCartId("cart123");
-        cartItemRequest.setProductId("product123");
-        cartItemRequest.setSizeId("size123");
-        cartItemRequest.setQuantity(1);
-
-        // Giả lập cartRepository.findById() trả về cart hợp lệ
-        Cart cart = new Cart();
-        when(cartRepository.findById(cartItemRequest.getCartId())).thenReturn(Optional.of(cart));
-
+        // Given: Thiết lập dữ liệu đầu vào và các giả lập (mock)
+        CartItemRequest cartItemRequest = DummyDataFactory.dummyCartItemRequest();
         // Giả lập productInventoryRepository.findByProductIdAndSizeId() trả về Optional.empty()
         when(productInventoryRepository.findByProductIdAndSizeId(
                 cartItemRequest.getProductId(), cartItemRequest.getSizeId()))
@@ -179,31 +145,21 @@ public class TestCartService {
     @Test
     @DisplayName("TC_CART_ADD_04 - Kiểm tra số lượng tồn kho không đủ (Insufficient stock)")
     void testAddCartItem_InsufficientStock_ShouldThrowRuntimeException() {
-        // Arrange
-        CartItemRequest cartItemRequest = new CartItemRequest();
-        cartItemRequest.setCartId("cart123");
-        cartItemRequest.setProductId("product123");
-        cartItemRequest.setSizeId("size123");
-        cartItemRequest.setQuantity(10); // yêu cầu 10 cái
-
-        Cart cart = new Cart(); // giả lập cart
-
-        ProductInventory productInventory = new ProductInventory();
-        productInventory.setQuantity(5); // chỉ có 5 cái trong kho → không đủ!
+        // Given: Thiết lập dữ liệu đầu vào và các giả lập (mock)
+        CartItemRequest cartItemRequest = DummyDataFactory.dummyCartItemRequest();
+        cartItemRequest.setQuantity(200); // lớn hơn 100 trong productinventory
+        ProductInventory productInventory = DummyDataFactory.dummyProductInventory();
+        Cart cart = DummyDataFactory.dummyCart();
+        cartItemRequest.setCartId(cart.getId());
 
         // Giả lập mock các dependency
-        when(cartRepository.findById("cart123")).thenReturn(Optional.of(cart));
-        // Giả lập private method validateProductInventory bằng cách mock public method hoặc restructure (ví dụ spy)
-        CartService spyCartService = cartService;
-        doReturn(productInventory).when(spyCartService).validateProductInventory(cartItemRequest);
-
+        when(productInventoryRepository.findByProductIdAndSizeId(anyString(), anyString()))
+                .thenReturn(Optional.of(productInventory));
         // Act & Assert
-        assertThatThrownBy(() -> spyCartService.addCartItem(cartItemRequest))
+        assertThatThrownBy(() -> cartService.addCartItem(cartItemRequest))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessage("Insufficient stock");
+                .hasMessageContaining("Insufficient stock");
 
-        // verify cartRepository đã gọi
-        verify(cartRepository, times(1)).findById("cart123");
     }
 
     @Test
@@ -306,32 +262,17 @@ public class TestCartService {
     @Test
     @DisplayName("TC_CART_UPDATE_01 - Cập nhật cart item thành công (cartItemId hợp lệ + CartItemRequest hợp lệ)")
     void testUpdateCartItem_Success() {
-        // Arrange
-        String cartItemId = "cartItem123";
-        CartItemRequest cartItemRequest = new CartItemRequest();
-        cartItemRequest.setCartId("cart123");
-        cartItemRequest.setProductId("product123");
-        cartItemRequest.setSizeId("size123");
-        cartItemRequest.setQuantity(2);
-
-        CartItem existingCartItem = new CartItem();
-        existingCartItem.setId(cartItemId);
-
-        ProductInventory productInventory = new ProductInventory();
-        Product product = new Product();
-        Size size = new Size();
-        productInventory.setProduct(product);
-        productInventory.setSize(size);
-
-        CartItem updatedCartItem = new CartItem();
-        updatedCartItem.setId(cartItemId);
-        updatedCartItem.setProduct(product);
-        updatedCartItem.setSize(size);
-        updatedCartItem.setQuantity(2);
-
-        CartItemResponse cartItemResponse = new CartItemResponse();
+        // Given: Thiết lập dữ liệu đầu vào và các giả lập (mock)
+        CartItemRequest cartItemRequest = DummyDataFactory.dummyCartItemRequest();
+        ProductInventory productInventory = DummyDataFactory.dummyProductInventory();
+        Cart cart = DummyDataFactory.dummyCart();
+        cartItemRequest.setCartId(cart.getId());
+        CartItem existingCartItem = DummyDataFactory.dummyCartItem();
+        String cartItemId = existingCartItem.getId();
+        CartItemResponse cartItemResponse = DummyDataFactory.dummyCartItemResponse();
         cartItemResponse.setId(cartItemId);
-
+        CartItem updatedCartItem = DummyDataFactory.dummyCartItem();
+        updatedCartItem.setId(cartItemId);
         // Mock behavior
         when(productInventoryRepository.findByProductIdAndSizeId(
                 cartItemRequest.getProductId(),

@@ -15,8 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.*;
 import org.mockito.MockitoAnnotations;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.PayOS;
 
@@ -32,27 +34,23 @@ import static org.springframework.test.web.client.ExpectedCount.times;
 @Transactional
 public class TestPaymentService {
 
-    @Mock
+    @MockBean
     private PaymentRepository paymentRepository;
 
-    @Mock
+    @MockBean
     private InvoiceRepository invoiceRepository;
 
-    @Mock
+    @MockBean
     private InvoiceService invoiceService;
 
-    @Mock
+    @MockBean
     private PayOS payOS;
 
     @Value("${app.client-url}")
     private String clientUrl;
 
-    @InjectMocks
+    @Autowired
     private PaymentService paymentService;  // Service cần test
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);  // Khởi tạo mock
-    }
 
     @Test
     @DisplayName("TC_PAYMENT_006: Payment không tồn tại - paymentId không tồn tại - Báo lỗi 'Payment not found' - Kiểm tra paymentId có trong DB không")
