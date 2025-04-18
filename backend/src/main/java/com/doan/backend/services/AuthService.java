@@ -42,11 +42,11 @@ public class AuthService {
 
     @NonFinal
     @Value("${app.base-url}")
-    String baseUrl;
+    public String baseUrl;
 
     @NonFinal
     @Value("${app.client-url}")
-    String clientUrl;
+    public String clientUrl;
 
     public ApiResponse<JwtResponse> loginWithEmail(LoginEmailRequest loginEmailRequest) {
         User user = userRepository.findByEmail(loginEmailRequest.getEmail())

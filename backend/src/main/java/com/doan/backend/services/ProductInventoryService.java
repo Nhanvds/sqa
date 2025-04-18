@@ -15,6 +15,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+
 @FieldDefaults(makeFinal = true, level = lombok.AccessLevel.PRIVATE)
 public class ProductInventoryService {
     ProductInventoryRepository productInventoryRepository;
