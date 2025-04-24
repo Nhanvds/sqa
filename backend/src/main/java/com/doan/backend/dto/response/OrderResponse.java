@@ -1,10 +1,7 @@
 package com.doan.backend.dto.response;
 
 import com.doan.backend.enums.OrderStatusEnum;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
@@ -15,6 +12,7 @@ import java.util.List;
 @Data
 @Builder
 @AllArgsConstructor
+@NoArgsConstructor
 public class OrderResponse {
     String id;
 

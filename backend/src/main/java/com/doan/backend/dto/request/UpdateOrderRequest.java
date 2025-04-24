@@ -1,9 +1,7 @@
 package com.doan.backend.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.springframework.validation.annotation.Validated;
 
@@ -11,6 +9,8 @@ import org.springframework.validation.annotation.Validated;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UpdateOrderRequest {
     @NotBlank(message = "User is required")
     String userId;

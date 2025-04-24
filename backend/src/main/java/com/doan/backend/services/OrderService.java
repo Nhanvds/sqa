@@ -16,9 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+//import java.math.RoundingMode;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,8 +109,10 @@ public class OrderService {
                 }
 
                 if (discount.get().getMinOrderValue().compareTo(totalPriceAfterDiscount) <= 0) {
-                    BigDecimal discountValue = totalPriceAfterDiscount.multiply(discount.get().getDiscountPercentage().divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
-
+//                    BigDecimal discountValue = totalPriceAfterDiscount.multiply(discount.get().getDiscountPercentage().divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                    BigDecimal discountValue = totalPriceAfterDiscount.multiply(
+                            discount.get().getDiscountPercentage().divide(BigDecimal.valueOf(100)).setScale(2, BigDecimal.ROUND_HALF_UP)
+                    );
                     if (discount.get().getDiscountType() == DiscountType.PERCENTAGE) {
                         if (discountValue.compareTo(discount.get().getMaxDiscountValue()) > 0) {
                             discountValue = discount.get().getMaxDiscountValue();
