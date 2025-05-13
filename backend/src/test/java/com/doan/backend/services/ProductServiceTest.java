@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @Transactional
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class ProductServiceTest {
+public class ProductServiceTest {
 
     @Autowired
     private ProductService productService;
