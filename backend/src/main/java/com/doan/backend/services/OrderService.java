@@ -199,7 +199,7 @@ public class OrderService {
         Order order = orderRepository.findById(clientUpdateOrderRequest.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found"));
 
-        if (!order.getUser().getId().equals(clientUpdateOrderRequest.getOrderId())) {
+        if (!order.getUser().getId().equals(clientUpdateOrderRequest.getUserId())) {
             throw new RuntimeException("You do not have permission to edit this order");
         }
 
