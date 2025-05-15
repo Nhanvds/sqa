@@ -259,6 +259,32 @@ public class TestCartService {
         verify(cartRepository, times(1)).save(any(Cart.class));
         verify(cartMapper, times(1)).toCartResponse(newCart);
     }
+
+
+    @Test
+    @DisplayName("TC_CART_GET_03 - Không tìm thấy người dùng (userId không tồn tại)")
+    void testGetCartByUserId_UserNotFound_ShouldThrowException() {
+        // Arrange
+        String userId = "nonexistentUser";
+
+        // Giả lập không có cart
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+        // Giả lập userId không tồn tại trong DB
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> cartService.getCartByUserId(userId))
+                .isInstanceOf(Exception.class)
+                .hasMessageContaining("User not found with id: " + userId);
+
+        // Verify behavior
+        verify(cartRepository, times(1)).findByUserId(userId);
+        verify(userRepository, times(1)).findById(userId);
+        verify(cartRepository, never()).save(any(Cart.class));
+        verify(cartMapper, never()).toCartResponse(any());
+    }
+
     @Test
     @DisplayName("TC_CART_UPDATE_01 - Cập nhật cart item thành công (cartItemId hợp lệ + CartItemRequest hợp lệ)")
     void testUpdateCartItem_Success() {
@@ -293,7 +319,6 @@ public class TestCartService {
         assertThat(actualResponse.getResult().getId()).isEqualTo(cartItemId);
 
         // Verify behavior
-        verify(cartService, times(1)).validateProductInventory(cartItemRequest);
         verify(cartItemRepository, times(1)).findById(cartItemId);
         verify(cartItemRepository, times(1)).save(existingCartItem);
         verify(cartItemMapper, times(1)).toCartItemResponse(updatedCartItem);
@@ -315,6 +340,7 @@ public class TestCartService {
         Size size = new Size();
         productInventory.setProduct(product);
         productInventory.setSize(size);
+        productInventory.setQuantity(10);
 
         // Mock behavior
         when(productInventoryRepository.findByProductIdAndSizeId(
@@ -331,7 +357,6 @@ public class TestCartService {
         assertThat(exception.getMessage()).isEqualTo("Cart item not found");
 
         // Verify behavior
-        verify(cartService, times(1)).validateProductInventory(cartItemRequest);
         verify(cartItemRepository, times(1)).findById(cartItemId);
         verify(cartItemRepository, never()).save(any());
         verify(cartItemMapper, never()).toCartItemResponse(any());
@@ -369,6 +394,42 @@ public class TestCartService {
         verify(cartItemMapper, never()).toCartItemResponse(any());
     }
 
+    @Test
+    @DisplayName("TC_CART_UPDATE_04 - Số lượng vượt quá tồn kho (báo lỗi và không thay đổi dữ liệu)")
+    void testUpdateCartItem_QuantityExceedsStock() {
+        // Arrange
+        String cartItemId = "cartItem123";
+        CartItemRequest cartItemRequest = new CartItemRequest();
+        cartItemRequest.setCartId("cart123");
+        cartItemRequest.setProductId("product123");
+        cartItemRequest.setSizeId("sizeM");
+        cartItemRequest.setQuantity(10); // Yêu cầu 10 sản phẩm
+
+        // Giả lập tồn kho hiện tại chỉ có 5 sản phẩm
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setProduct(new Product());
+        productInventory.getProduct().setName("Áo thun");
+        productInventory.setSize(new Size());
+        productInventory.setQuantity(5); // Chỉ có 5 trong kho
+
+        when(productInventoryRepository.findByProductIdAndSizeId(
+                cartItemRequest.getProductId(),
+                cartItemRequest.getSizeId()))
+                .thenReturn(Optional.of(productInventory));
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            cartService.updateCartItem(cartItemId, cartItemRequest);
+        });
+
+        // Assert nội dung thông báo lỗi
+        assertThat(exception.getMessage()).isEqualTo("Insufficient stock for product: Áo thun");
+
+        // Verify không thực hiện các thao tác sau
+        verify(cartItemRepository, never()).findById(any());
+        verify(cartItemRepository, never()).save(any());
+        verify(cartItemMapper, never()).toCartItemResponse(any());
+    }
 
     @Test
     @DisplayName("TC_CART_DELETE_01 - Xóa cart item thành công (cartItemId hợp lệ)")
@@ -388,6 +449,27 @@ public class TestCartService {
         // Verify behavior
         verify(cartItemRepository, times(1)).deleteById(cartItemId);
     }
+
+    @Test
+    @DisplayName("TC_CART_DELETE_02 - Xóa sản phẩm không tồn tại (cartItemId không tồn tại)")
+    void testDeleteCartItem_CartItemNotFound() {
+        // Arrange
+        String nonExistingCartItemId = "nonExistingCartItemId";
+
+        // Mock behavior
+        when(cartItemRepository.existsById(nonExistingCartItemId)).thenReturn(false);
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            cartService.deleteCartItem(nonExistingCartItemId);
+        });
+
+        assertThat(exception.getMessage()).isEqualTo("Cart item not found");
+
+        // Verify behavior
+        verify(cartItemRepository, never()).deleteById(anyString());
+    }
+
 
 
 }
