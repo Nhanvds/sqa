@@ -1,10 +1,7 @@
 package com.doan.backend.dto.response;
 
 import com.doan.backend.enums.InvoiceStatusEnum;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
@@ -14,6 +11,7 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 @AllArgsConstructor
+@NoArgsConstructor
 public class InvoiceResponse {
     String id;
 

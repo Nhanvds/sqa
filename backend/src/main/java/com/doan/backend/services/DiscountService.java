@@ -59,7 +59,7 @@ public class DiscountService {
 
         return ApiResponse.<Discount>builder()
                 .code(200)
-                .message("create created successfully")
+                .message("Discount created successfully")
                 .result(discountRepository.save(discount))
                 .build();
     }
@@ -90,7 +90,7 @@ public class DiscountService {
         discountRepository.deleteById(id);
         return ApiResponse.<Void>builder()
                 .code(200)
-                .message("Discount deleted  successfully")
+                .message("Discount deleted successfully")
                 .build();
     }
 
