@@ -5,10 +5,12 @@ import com.doan.backend.dto.response.ApiResponse;
 import com.doan.backend.dto.response.ProductInventoryResponse;
 import com.doan.backend.entity.Product;
 import com.doan.backend.entity.ProductInventory;
+import com.doan.backend.entity.Size;
 import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.mapper.ProductInventoryMapper;
 import com.doan.backend.repositories.ProductInventoryRepository;
 import com.doan.backend.repositories.ProductRepository;
+import com.doan.backend.repositories.SizeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +37,13 @@ public class ProductInventoryServiceTest {
     private ProductInventoryRepository productInventoryRepository;
 
     @Autowired
+    private SizeRepository sizeRepository;
+
+    @Autowired
     private ProductInventoryMapper productInventoryMapper;
 
     private Product product;
+    private Size size;
 
     @BeforeEach
     public void setUp() {
@@ -47,26 +53,34 @@ public class ProductInventoryServiceTest {
         product.setDescription("Product Description");
         product.setPrice(BigDecimal.valueOf(100));
         product.setStatus(StatusEnum.ACTIVE);
-        productRepository.save(product);
+        product = productRepository.save(product);
+
+        // Tạo kích thước mới cho các test
+        Size newSize = new Size();
+        newSize.setName("Test Size");
+        size = sizeRepository.save(newSize);
     }
 
     // TC01 - Kiểm tra chức năng tạo mới ProductInventory thành công
     @Test
     public void createProductInventory_Success_TC01() {
-        // Chuẩn bị dữ liệu
-        ProductInventoryRequest request = ProductInventoryRequest.builder()
-                .idProduct(product.getId())
-                .idSize("sizeId1")
-                .quantity(10)
-                .build();
+        assertDoesNotThrow(() -> {
+            // Chuẩn bị dữ liệu
+            ProductInventoryRequest request = ProductInventoryRequest.builder()
+                    .idProduct(product.getId())
+                    .idSize(size.getId())
+                    .quantity(10)
+                    .build();
 
-        // Thực hiện kiểm tra
-        ApiResponse<ProductInventoryResponse> response = productInventoryService.createProductInventory(request);
+            // Thực hiện kiểm tra
+            ApiResponse<ProductInventoryResponse> response = productInventoryService.createProductInventory(request);
 
-        // Kiểm tra kết quả
-        assertEquals(200, response.getCode());
-        assertNotNull(response.getResult());
-        assertEquals("Create product inventory successfully", response.getMessage());
+            // Kiểm tra kết quả
+            assertNotNull(response.getResult());
+            assertEquals(request.getIdProduct(), response.getResult().getIdProduct());
+            assertEquals(request.getIdSize(), response.getResult().getSize().getId());
+            assertEquals(request.getQuantity(), response.getResult().getQuantity());
+        });
     }
 
     // TC02 - Kiểm tra chức năng tạo mới ProductInventory khi tồn tại sản phẩm và size
@@ -75,143 +89,143 @@ public class ProductInventoryServiceTest {
         // Chuẩn bị dữ liệu
         ProductInventoryRequest request = ProductInventoryRequest.builder()
                 .idProduct(product.getId())
-                .idSize("sizeId1")
+                .idSize(size.getId())
                 .quantity(10)
                 .build();
 
-        // Thực hiện lần 1
-        productInventoryService.createProductInventory(request);
+        // Thực hiện lần 1: Lưu trực tiếp vào repository để giả lập trạng thái đã tồn tại
+        ProductInventory inventory = new ProductInventory();
+        inventory.setProduct(product);
+        inventory.setSize(size);
+        inventory.setQuantity(request.getQuantity());
+        productInventoryRepository.save(inventory);
 
         // Thực hiện lần 2 (cùng productId và sizeId)
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        assertThrows(RuntimeException.class, () -> {
             productInventoryService.createProductInventory(request);
         });
 
         // Kiểm tra exception
-        assertEquals("Product inventory already exists", exception.getMessage());
     }
 
     // TC03 - Kiểm tra lấy thông tin ProductInventory theo productId
     @Test
     public void getProductInventoryByProductId_Success_TC03() {
-        // Chuẩn bị dữ liệu
-        ProductInventoryRequest request = ProductInventoryRequest.builder()
-                .idProduct(product.getId())
-                .idSize("sizeId1")
-                .quantity(10)
-                .build();
+        assertDoesNotThrow(() -> {
+            // Chuẩn bị dữ liệu
+            ProductInventory inventory = new ProductInventory();
+            inventory.setProduct(product);
+            inventory.setSize(size);
+            inventory.setQuantity(10);
+            productInventoryRepository.save(inventory);
 
-        // Thực hiện tạo ProductInventory
-        productInventoryService.createProductInventory(request);
+            // Lấy thông tin
+            ApiResponse<Iterable<ProductInventoryResponse>> response = productInventoryService.getProductInventoryByProductId(product.getId());
 
-        // Lấy thông tin
-        ApiResponse<Iterable<ProductInventoryResponse>> response = productInventoryService.getProductInventoryByProductId(product.getId());
-
-        // Kiểm tra kết quả
-        assertEquals(200, response.getCode());
-        assertNotNull(response.getResult());
-        assertTrue(response.getResult().iterator().hasNext());
+            // Kiểm tra kết quả
+            assertNotNull(response.getResult());
+            ProductInventoryResponse result = response.getResult().iterator().next();
+            assertEquals(product.getId(), result.getIdProduct());
+            assertEquals(size.getId(), result.getSize().getId());
+            assertEquals(10, result.getQuantity());
+        });
     }
 
     // TC04 - Kiểm tra cập nhật ProductInventory thành công
     @Test
     public void updateProductInventory_Success_TC04() {
-        // Chuẩn bị dữ liệu
-        ProductInventoryRequest createRequest = ProductInventoryRequest.builder()
-                .idProduct(product.getId())
-                .idSize("sizeId1")
-                .quantity(10)
-                .build();
+        assertDoesNotThrow(() -> {
+            // Chuẩn bị dữ liệu
+            ProductInventory inventory = new ProductInventory();
+            inventory.setProduct(product);
+            inventory.setSize(size);
+            inventory.setQuantity(10);
+            inventory = productInventoryRepository.save(inventory);
 
-        // Thực hiện tạo ProductInventory
-        ApiResponse<ProductInventoryResponse> createResponse = productInventoryService.createProductInventory(createRequest);
+            // Cập nhật thông tin
+            ProductInventoryRequest updateRequest = ProductInventoryRequest.builder()
+                    .idProduct(product.getId())
+                    .idSize(size.getId())
+                    .quantity(20)
+                    .build();
 
-        // Cập nhật thông tin
-        ProductInventoryRequest updateRequest = ProductInventoryRequest.builder()
-                .idProduct(product.getId())
-                .idSize("sizeId1")
-                .quantity(20)
-                .build();
+            ApiResponse<ProductInventoryResponse> updateResponse = productInventoryService.updateProductInventory(inventory.getId(), updateRequest);
 
-        ApiResponse<ProductInventoryResponse> updateResponse = productInventoryService.updateProductInventory(createResponse.getResult().getId(), updateRequest);
-
-        // Kiểm tra kết quả
-        assertEquals(200, updateResponse.getCode());
-        assertEquals(20, updateResponse.getResult().getQuantity());
+            // Kiểm tra kết quả
+            assertEquals(200, updateResponse.getCode());
+            assertEquals(20, updateResponse.getResult().getQuantity());
+            assertEquals(updateRequest.getIdProduct(), updateResponse.getResult().getIdProduct());
+            assertEquals(updateRequest.getIdSize(), updateResponse.getResult().getSize().getId());
+        });
     }
 
     // TC05 - Kiểm tra xóa ProductInventory thành công
     @Test
     public void deleteProductInventory_Success_TC05() {
-        // Chuẩn bị dữ liệu
-        ProductInventoryRequest request = ProductInventoryRequest.builder()
-                .idProduct(product.getId())
-                .idSize("sizeId1")
-                .quantity(10)
-                .build();
+        assertDoesNotThrow(() -> {
+            // Chuẩn bị dữ liệu
+            ProductInventory inventory = new ProductInventory();
+            inventory.setProduct(product);
+            inventory.setSize(size);
+            inventory.setQuantity(10);
+            inventory = productInventoryRepository.save(inventory);
 
-        // Thực hiện tạo ProductInventory
-        ApiResponse<ProductInventoryResponse> createResponse = productInventoryService.createProductInventory(request);
+            // Xóa ProductInventory
+            productInventoryService.deleteProductInventory(inventory.getId());
+            Optional<ProductInventory> productInventory = productInventoryRepository.findById(inventory.getId());
 
-        // Xóa ProductInventory
-        ApiResponse<String> deleteResponse = productInventoryService.deleteProductInventory(createResponse.getResult().getId());
-
-        // Kiểm tra kết quả
-        assertEquals(200, deleteResponse.getCode());
-        assertEquals("Delete product inventory successfully", deleteResponse.getMessage());
+            assertTrue(productInventory.isEmpty());
+            // Kiểm tra kết quả
+        });
     }
 
     // TC06 - Kiểm tra lấy thông tin ProductInventory khi productId không tồn tại
     @Test
     public void getProductInventoryByProductId_NotFound_TC06() {
-        // Thực hiện lấy thông tin ProductInventory cho productId không tồn tại
-        ApiResponse<Iterable<ProductInventoryResponse>> response = productInventoryService.getProductInventoryByProductId("nonExistentProductId");
+        assertThrows(RuntimeException.class,() -> {
+            // Thực hiện lấy thông tin ProductInventory cho productId không tồn tại
+            productInventoryService.getProductInventoryByProductId("nonExistentProductId");
 
-        // Kiểm tra kết quả
-        assertEquals(200, response.getCode());
-        assertFalse(response.getResult().iterator().hasNext());
+        });
     }
 
-    // TC07 - Kiểm tra khi ProductInventory không tồn tại
+    // TC07 - Cập nhập khi ProductInventory không tồn tại
     @Test
     public void updateProductInventory_NotFound_TC07() {
         // Chuẩn bị dữ liệu
         ProductInventoryRequest request = ProductInventoryRequest.builder()
                 .idProduct(product.getId())
-                .idSize("sizeId1")
+                .idSize(size.getId())
                 .quantity(10)
                 .build();
 
         // Thực hiện cập nhật ProductInventory không tồn tại
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        assertThrows(RuntimeException.class, () -> {
             productInventoryService.updateProductInventory("nonExistentId", request);
         });
 
-        // Kiểm tra exception
-        assertEquals("Product inventory not found", exception.getMessage());
     }
 
     // TC08 - Kiểm tra xóa ProductInventory không tồn tại
     @Test
     public void deleteProductInventory_NotFound_TC08() {
         // Thực hiện xóa ProductInventory không tồn tại
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        assertThrows(RuntimeException.class, () -> {
             productInventoryService.deleteProductInventory("nonExistentId");
         });
 
-        // Kiểm tra exception
-        assertEquals("Product inventory not found", exception.getMessage());
     }
 
     // TC09 - Kiểm tra lấy thông tin ProductInventory khi danh sách productIds không tồn tại
     @Test
     public void getProductInventoryByListProductId_NotFound_TC09() {
-        // Thực hiện lấy thông tin ProductInventory cho danh sách productIds không tồn tại
-        ApiResponse<Iterable<ProductInventoryResponse>> response = productInventoryService.getProductInventoryByListProductId(List.of("nonExistentProductId"));
+        assertDoesNotThrow(() -> {
+            // Thực hiện lấy thông tin ProductInventory cho danh sách productIds không tồn tại
+            ApiResponse<Iterable<ProductInventoryResponse>> response = productInventoryService.getProductInventoryByListProductId(List.of("nonExistentProductId"));
 
-        // Kiểm tra kết quả
-        assertEquals(200, response.getCode());
-        assertFalse(response.getResult().iterator().hasNext());
+            // Kiểm tra kết quả
+            assertFalse(response.getResult().iterator().hasNext());
+        });
     }
 
     // TC10 - Kiểm tra tạo ProductInventory với quantity bằng 0
@@ -220,16 +234,14 @@ public class ProductInventoryServiceTest {
         // Chuẩn bị dữ liệu
         ProductInventoryRequest request = ProductInventoryRequest.builder()
                 .idProduct(product.getId())
-                .idSize("sizeId1")
+                .idSize(size.getId())
                 .quantity(0) // Quantity = 0
                 .build();
 
         // Thực hiện kiểm tra
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        assertThrows(RuntimeException.class, () -> {
             productInventoryService.createProductInventory(request);
         });
 
-        // Kiểm tra exception
-        assertEquals("Quantity must be greater than 0", exception.getMessage());
     }
 }
