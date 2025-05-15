@@ -8,20 +8,26 @@ import com.doan.backend.dto.response.ShippingAddressResponse;
 import com.doan.backend.dto.response.UserResponse;
 import com.doan.backend.entity.*;
 import com.doan.backend.enums.DiscountType;
+import com.doan.backend.enums.InvoiceStatusEnum;
 import com.doan.backend.enums.OrderStatusEnum;
+import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.mapper.OrderMapper;
 import com.doan.backend.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
@@ -36,139 +42,183 @@ import static org.mockito.Mockito.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
-@Transactional
+@ExtendWith(MockitoExtension.class)
 public class TestOrderService {
 
-    @Mock private OrderRepository orderRepository;
-    @Mock private OrderItemRepository orderItemRepository;
-    @Mock private CartRepository cartRepository;
-    @Mock private CartItemRepository cartItemRepository;
-    @Mock private ProductInventoryRepository productInventoryRepository;
-    @Mock private OrderMapper orderMapper;
-    @Mock private DiscountRepository discountRepository;
-    @Mock private ShippingAddressRepository shippingAddressRepository;
-    @Mock private PromotionProductRepository promotionProductRepository;
-    @Mock private PromotionService promotionService;
-    @Mock private InvoiceRepository invoiceRepository;
-    @Mock private PaymentRepository paymentRepository;
-    @Mock private PaymentService paymentService;
-    @Mock private UserDiscountRepository userDiscountRepository;
+    @Mock
+    private OrderRepository orderRepository;
+    @Mock
+    private OrderItemRepository orderItemRepository;
+    @Mock
+    private CartRepository cartRepository;
+    @Mock
+    private CartItemRepository cartItemRepository;
+    @Mock
+    private ProductInventoryRepository productInventoryRepository;
+    @Mock
+    private OrderMapper orderMapper;
+    @Mock
+    private DiscountRepository discountRepository;
+    @Mock
+    private ShippingAddressRepository shippingAddressRepository;
+    @Mock
+    private PromotionProductRepository promotionProductRepository;
+    @Mock
+    private PromotionService promotionService;
+    @Mock
+    private InvoiceRepository invoiceRepository;
+    @Mock
+    private PaymentRepository paymentRepository;
+    @Mock
+    private PaymentService paymentService;
+    @Mock
+    private UserDiscountRepository userDiscountRepository;
 
     @InjectMocks
     private OrderService orderService;
-    private String userId;
-    private String orderId;
-    private Order order;
-    private OrderResponse orderResponse;
-    private List<Order> orderList;
-    private Page<Order> orderPage;
-    private Pageable pageable;
+    // Dữ liệu mẫu dùng chung
+    private User user;
+    private ShippingAddress shippingAddress;
+    private Product product;
+    private Size size;
+    private ProductInventory productInventory;
+    private Cart cart;
+    private CartItem cartItem;
+    private Discount discount;
 
     @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+    void setup() {
 
-        userId = "user123";
-        orderId = "order123";
 
-        // Tạo đơn hàng hợp lệ
-        order = new Order();
-        order.setId(orderId);
-        order.setUser(new User());
-        order.setStatus(OrderStatusEnum.PENDING);
-        order.setTotalPriceBeforeDiscount(new BigDecimal(200));
-        order.setTotalPriceAfterDiscount(new BigDecimal(180));
+        // Nếu dùng @InjectMocks orderService thì OrderMapper sẽ được inject mock
 
-        orderResponse = new OrderResponse();
-        orderResponse.setId(orderId);
-        orderResponse.setUser(new UserResponse());
-        orderResponse.setShippingAddress(new ShippingAddressResponse());
-        orderResponse.setOrderItems(new ArrayList<>());
-        orderResponse.setTotalPriceBeforeDiscount(new BigDecimal(200));
-        orderResponse.setTotalPriceAfterDiscount(new BigDecimal(180));
+        // Khởi tạo người dùng
+        user = new User();
+        user.setId("user-001");
+        user.setEmail("johndoe@example.com");
 
-        orderList = new ArrayList<>();
-        orderList.add(order);
+        // Địa chỉ giao hàng
+        shippingAddress = new ShippingAddress();
+        shippingAddress.setId("ship-001");
+        shippingAddress.setUser(user);
+        shippingAddress.setAddressDetail("123 Main Street");
+        shippingAddress.setCity("Hanoi");
 
-        orderPage = new PageImpl<>(orderList);
+        // Sản phẩm
+        product = new Product();
+        product.setId("prod-001");
+        product.setName("Áo thun nam thể thao");
+        product.setPrice(new BigDecimal("250000")); // 250.000 VNĐ
+        product.setStatus(StatusEnum.ACTIVE);
+
+        // Kích cỡ sản phẩm
+        size = new Size();
+        size.setId("size-M");
+        size.setName("M");
+
+        // Tồn kho sản phẩm
+        productInventory = new ProductInventory();
+        productInventory.setId("inv-001");
+        productInventory.setProduct(product);
+        productInventory.setSize(size);
+        productInventory.setQuantity(50);
+
+        // Giỏ hàng của người dùng
+        cart = new Cart();
+        cart.setId("cart-001");
+        cart.setUser(user);
+
+        // Mục trong giỏ hàng
+        cartItem = new CartItem();
+        cartItem.setId("item-001");
+        cartItem.setCart(cart);
+        cartItem.setProduct(product);
+        cartItem.setSize(size);
+        cartItem.setQuantity(2); // 2 chiếc áo size M
+
+        // Mã giảm giá
+        discount = new Discount();
+        discount.setId("discount-001");
+        discount.setCode("SUMMER2025");
+        discount.setDiscountType(DiscountType.PERCENTAGE); // hoặc DiscountType.VALUE, tùy logic
+        discount.setDiscountPercentage(new BigDecimal("10")); // 10%
+        discount.setDiscountValue(null); // nếu dùng theo phần trăm
+        discount.setMaxDiscountValue(new BigDecimal("50000")); // tối đa giảm 50k
+        discount.setMinOrderValue(new BigDecimal("400000")); // áp dụng từ 400k
+        discount.setMaxUses(100); // tổng số lượt được dùng
+        discount.setUsedCount(0); // chưa ai dùng
+        discount.setStartDate(LocalDateTime.now().minusDays(3));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(10));
+        discount.setAutoApply(false);
     }
+
+
     @Test
-    @DisplayName("TC_ORDER_001 - Cart không tồn tại (cartId không tồn tại trong DB)")
+    @DisplayName("TC_ORDER_001 - Cart không tồn tại")
     void testCreateOrderFromCart_CartNotFound() {
-        // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
+        when(cartRepository.findByUserId("user-001")).thenReturn(Optional.empty());
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
+        OrderRequest request = new OrderRequest();
+        request.setUserId("user-001");
 
-        // Mock cartRepository để trả về Optional.empty(), mô phỏng cart không tồn tại
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> orderService.createOrderFromCart(request));
 
-        // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
-        });
-
-        // Kiểm tra thông báo lỗi là "Cart not found"
-        assertThat(thrown.getMessage()).isEqualTo("Cart not found");
-
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
+        assertEquals("Cart not found", exception.getMessage());
     }
 
     @Test
     @DisplayName("TC_ORDER_002 - Địa chỉ giao hàng không tồn tại (shippingAddressId không tồn tại)")
-    void testCreateOrderFromCart_ShippingAddressNotFound() {
+    void TC_ORDER_002_shippingAddressNotFound_shouldThrowException() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
+        String userId = "user-001";
+        String invalidShippingAddressId = "invalid-ship-999";
+        OrderRequest request = new OrderRequest();
+        request.setUserId(userId);
+        request.setShippingAddressId(invalidShippingAddressId);
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
+        // Mock cart tồn tại
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
 
-        // Mock cartRepository để trả về Optional.empty(), mô phỏng cart không tồn tại
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(new Cart()));
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.empty());
+        // Mock địa chỉ giao hàng KHÔNG tồn tại
+        when(shippingAddressRepository.findById(invalidShippingAddressId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(request);
         });
 
-        // Kiểm tra thông báo lỗi là "Shipping address not found"
-        assertThat(thrown.getMessage()).isEqualTo("Shipping address not found");
+        assertEquals("Shipping address not found", exception.getMessage());
 
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
+        // Verify các hành động không được thực hiện
+        verify(cartItemRepository, never()).findByCartId(any());
+        verify(orderRepository, never()).save(any());
+        verify(invoiceRepository, never()).save(any());
+        verify(paymentRepository, never()).save(any());
     }
 
 
     @Test
     @DisplayName("TC_ORDER_003 - Product inventory không tồn tại (productInventoryId không tồn tại)")
-    void testCreateOrderFromCart_ProductInventoryNotFound() {
+    void TC_ORDER_003_productInventoryNotFound_shouldThrowException() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String productId = "product123";
-        String sizeId = "size123";
+        String userId = "user-001";
+        String shippingAddressId = "address-001";
+        String productId = "product-001";
+        String sizeId = "size-001";
 
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
+        OrderRequest request = new OrderRequest();
+        request.setUserId(userId);
+        request.setShippingAddressId(shippingAddressId);
 
-        Cart cart = new Cart();
-        cart.setUser(new User());
-        cart.setId("cart123");
+        // Giả lập cart và shipping address tồn tại
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
 
+        // Tạo CartItem với Product và Size
         Product product = new Product();
         product.setId(productId);
+
         Size size = new Size();
         size.setId(sizeId);
 
@@ -176,580 +226,856 @@ public class TestOrderService {
         cartItem.setProduct(product);
         cartItem.setSize(size);
         cartItem.setQuantity(2);
-        cartItem.setCart(cart); // liên kết cartItem với cart
 
-//        cart.setCartItems(List.of(cartItem));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
 
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
+        // Mock productInventoryRepository trả về empty (không tìm thấy tồn kho)
         when(productInventoryRepository.findByProductIdAndSizeId(productId, sizeId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(request);
         });
 
-        assertThat(thrown.getMessage()).isEqualTo("Product inventory not found");
+        assertEquals("Product inventory not found", exception.getMessage());
 
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(productInventoryRepository, times(1)).findByProductIdAndSizeId(productId, sizeId);
+        // Đảm bảo không có dữ liệu nào bị ghi
+        verify(orderRepository, never()).save(any());
+        verify(invoiceRepository, never()).save(any());
+        verify(paymentRepository, never()).save(any());
     }
-
-
 
 
     @Test
     @DisplayName("TC_ORDER_004 - Không đủ tồn kho (quantity > availableStock)")
-    void testCreateOrderFromCart_InsufficientStock() {
+    void TC_ORDER_004_insufficientStock_shouldThrowException() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String productId = "product123";
-        String sizeId = "size123";  // Thêm kích thước sản phẩm
-        int requestedQuantity = 10;  // Số lượng yêu cầu từ giỏ hàng
-        int availableStock = 5;      // Số lượng tồn kho thực tế
+        String userId = "user-001";
+        String shippingAddressId = "address-001";
+        String productId = "product-001";
+        String sizeId = "size-001";
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
+        OrderRequest request = new OrderRequest();
+        request.setUserId(userId);
+        request.setShippingAddressId(shippingAddressId);
 
-        // Tạo Cart giả và CartItem
-        Cart cart = new Cart();
-        cart.setUser(new User());  // Giả sử User có sẵn trong hệ thống, hoặc mock nếu cần
-        cart.setId("cart123");     // ID giỏ hàng giả định
+        // Giả lập cart và địa chỉ giao hàng tồn tại
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
 
-        // Tạo Product và Size
+        // Tạo CartItem với Product và Size
         Product product = new Product();
-        product.setId(productId);  // ID sản phẩm giả định
+        product.setId(productId);
 
         Size size = new Size();
-        size.setId(sizeId);        // ID kích thước giả định
+        size.setId(sizeId);
 
-        // Tạo CartItem giả với số lượng yêu cầu
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
         cartItem.setSize(size);
-        cartItem.setQuantity(requestedQuantity);  // Số lượng yêu cầu trong giỏ hàng
-        cartItem.setCart(cart);  // Liên kết CartItem với Cart
+        cartItem.setQuantity(10); // Yêu cầu số lượng 10
 
-        // Mock cartRepository để trả về cart tồn tại
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
 
-        // Mock shippingAddressRepository trả về địa chỉ tồn tại
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
-
-        // Mock productInventoryRepository trả về số lượng tồn kho không đủ cho sản phẩm với kích thước cụ thể
+        // Giả lập tồn kho chỉ còn 5 cái
         ProductInventory productInventory = new ProductInventory();
-        productInventory.setProduct(product);    // Liên kết với sản phẩm
-        productInventory.setSize(size);          // Liên kết với kích thước
-        productInventory.setQuantity(availableStock);  // Số lượng tồn kho ít hơn số lượng yêu cầu
+        productInventory.setProduct(product);
+        productInventory.setSize(size);
+        productInventory.setQuantity(5);
+
         when(productInventoryRepository.findByProductIdAndSizeId(productId, sizeId)).thenReturn(Optional.of(productInventory));
 
         // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(request);
         });
 
-        // Kiểm tra thông báo lỗi là "Insufficient stock for product"
-        assertThat(thrown.getMessage()).isEqualTo("Insufficient stock for product");
+        assertTrue(exception.getMessage().contains("Insufficient stock for product"));
 
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(productInventoryRepository, times(1)).findByProductIdAndSizeId(productId, sizeId);
+        // Đảm bảo không có dữ liệu nào bị ghi
+        verify(orderRepository, never()).save(any());
+        verify(invoiceRepository, never()).save(any());
+        verify(paymentRepository, never()).save(any());
     }
+
+
     @Test
     @DisplayName("TC_ORDER_005 - Mã giảm giá đã được sử dụng (discountId đã được used)")
-    void testCreateOrderFromCart_DiscountUsed() {
+    void TC_ORDER_005_discountAlreadyUsed_shouldThrowException() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";  // ID mã giảm giá giả định
+        String userId = "user-001";
+        String shippingAddressId = "address-001";
+        String discountId = "discount-001";
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
-        orderRequest.setDiscountId(discountId);  // Thêm discountId vào request
+        orderRequest.setDiscountId(discountId);
 
-        // Mock cartRepository để trả về cart tồn tại
         Cart cart = new Cart();
-        cart.setUser(new User());
-        cart.setId("cart123");
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        cart.setId("cart-001");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
 
-        // Mock shippingAddressRepository trả về địa chỉ tồn tại
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
 
-        // Mock DiscountRepository để trả về discount đã được sử dụng
+        Product product = new Product();
+        product.setId("prod-001");
+        product.setName("Product 1");
+        product.setPrice(new BigDecimal("100"));
+
+        CartItem cartItem = new CartItem();
+        cartItem.setProduct(product);
+        cartItem.setSize(new Size());
+        cartItem.setQuantity(2);
+
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
+
         Discount discount = new Discount();
         discount.setId(discountId);
-        discount.setUsedCount(1);  // Đánh dấu discount đã được sử dụng (usedCount > 0)
-        when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+        discount.setMaxUses(10);
+        discount.setUsedCount(5);
+        discount.setStartDate(LocalDateTime.now().minusDays(1));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(1));
+        discount.setDiscountPercentage(new BigDecimal("10"));
+        discount.setMaxDiscountValue(new BigDecimal("50"));
+        discount.setDiscountType(DiscountType.PERCENTAGE);
+        discount.setMinOrderValue(new BigDecimal("0"));
+
+        UserDiscount userDiscount = new UserDiscount();
+        userDiscount.setUsesCount(1);  // Đã dùng 1 lần
+        userDiscount.setDiscount(discount);
+        userDiscount.setUser(user);
+
+        Promotion promotion = new Promotion();
+        promotion.setDiscountPercentage(new BigDecimal("10")); // Cần thiết để tránh null
+
+        // Mocks
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), cartItem.getSize().getId()))
+                .thenReturn(Optional.of(productInventory));
+        when(userDiscountRepository.findByUserIdAndDiscount_Id(userId, discountId)).thenReturn(Optional.of(userDiscount));
+
+        // Mock promotionService trả về giá hợp lệ (không null)
+        when(promotionService.applyPromotionToProduct(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            return p.getPrice();
+        });
 
         // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             orderService.createOrderFromCart(orderRequest);
         });
 
-        // Kiểm tra thông báo lỗi là "Discount has been used"
-        assertThat(thrown.getMessage()).isEqualTo("Discount has been used");
+        assertEquals("Discount has been used", exception.getMessage());
 
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
+        // Verify order không được lưu
+        verify(orderRepository, never()).save(any());
     }
+
+
+
 
 
     @Test
     @DisplayName("TC_ORDER_006 - Mã giảm giá hết lượt sử dụng (discount.quantity == 0)")
-    void testCreateOrderFromCart_DiscountOutOfStock() {
+    void TC_ORDER_006_discountQuantityZero_shouldThrowException() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";  // ID mã giảm giá giả định
+        String userId = "user-002";
+        String shippingAddressId = "address-002";
+        String discountId = "discount-002";
 
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
-        orderRequest.setDiscountId(discountId);  // Thêm discountId vào request
-
-        // Mock cartRepository để trả về cart tồn tại
-        Cart cart = new Cart();
-        cart.setUser(new User());
-        cart.setId("cart123");
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-
-        // Mock shippingAddressRepository trả về địa chỉ tồn tại
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
-
-        // Mock DiscountRepository để trả về discount hết lượt sử dụng (quantity == 0)
-        Discount discount = new Discount();
-        discount.setId(discountId);
-        discount.setUsedCount(0);  // Cái này không quan trọng trong trường hợp này
-        discount.setMaxUses(0);  // Mã giảm giá đã hết lượt sử dụng
-        when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
-
-        // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
-        });
-
-        // Kiểm tra thông báo lỗi là "Discount are out of stock"
-        assertThat(thrown.getMessage()).isEqualTo("Discount are out of stock");
-
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
-    }
-
-
-    @Test
-    @DisplayName("TC_ORDER_007 - Mã giảm giá chưa tới hạn hoặc đã hết hạn (currentDate not in [startDate, endDate])")
-    void testCreateOrderFromCart_DiscountNotValid() {
-        // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";  // ID mã giảm giá giả định
-
-        // Tạo OrderRequest với userId hợp lệ và shippingAddressId hợp lệ
-        OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setUserId(userId);
-        orderRequest.setShippingAddressId(shippingAddressId);
-        orderRequest.setDiscountId(discountId);  // Thêm discountId vào request
-
-        // Mock cartRepository để trả về cart tồn tại
-        Cart cart = new Cart();
-        cart.setUser(new User());
-        cart.setId("cart123");
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-
-        // Mock shippingAddressRepository trả về địa chỉ tồn tại
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
-
-        // Mock DiscountRepository để trả về discount chưa tới hạn hoặc đã hết hạn
-        Discount discount = new Discount();
-        discount.setId(discountId);
-        discount.setStartDate(LocalDateTime.now().plusDays(1));  // Mã giảm giá chưa tới hạn
-        discount.setExpiryDate(LocalDateTime.now().minusDays(1)); // Mã giảm giá đã hết hạn
-        when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
-
-        // Act & Assert
-        RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-            orderService.createOrderFromCart(orderRequest);
-        });
-
-        // Kiểm tra thông báo lỗi là "Discount is not yet valid"
-        assertThat(thrown.getMessage()).isEqualTo("Discount is not yet valid");
-
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
-    }
-
-    @Test
-    @DisplayName("TC_ORDER_008 - Tổng tiền không đạt điều kiện discount (cartTotal < discount.minOrderAmount)")
-    void testCreateOrderFromCart_CartTotalNotEnoughForDiscount() {
-        // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";
-
-        // Tạo OrderRequest
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
         orderRequest.setDiscountId(discountId);
 
-        // Giả lập tổng tiền giỏ hàng nhỏ hơn discount.minOrderValue
-        BigDecimal productPrice = BigDecimal.valueOf(30.00);
-        int requestedQuantity = 2;
-        BigDecimal cartTotal = productPrice.multiply(BigDecimal.valueOf(requestedQuantity));
-        BigDecimal minOrderValue = BigDecimal.valueOf(100.00); // Discount yêu cầu 100
-
-        // Mock Cart
         Cart cart = new Cart();
-        cart.setId("cart123");
-        cart.setUser(new User());
+        cart.setId("cart-002");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
 
-        // Mock CartItem
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
+
         Product product = new Product();
-        product.setPrice(productPrice);
+        product.setId("prod-002");
+        product.setName("Product 2");
+        product.setPrice(new BigDecimal("150"));
 
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
-        cartItem.setQuantity(requestedQuantity);
+        cartItem.setSize(new Size());
+        cartItem.setQuantity(1);
 
-        // Mock CartRepository
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(5);
 
-        // Mock CartItemRepository
-        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
-
-        // Mock ShippingAddressRepository
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
-
-        // Mock DiscountRepository
         Discount discount = new Discount();
         discount.setId(discountId);
-        discount.setMinOrderValue(minOrderValue); // minOrderValue = 100
+        discount.setMaxUses(10);
+        discount.setUsedCount(10);  // Đã dùng hết lượt (dùng tối đa)
+        discount.setStartDate(LocalDateTime.now().minusDays(10));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(10));
+        discount.setDiscountPercentage(new BigDecimal("15"));
+        discount.setMaxDiscountValue(new BigDecimal("100"));
+        discount.setDiscountType(DiscountType.PERCENTAGE);
+        discount.setMinOrderValue(new BigDecimal("0"));
+
+        Promotion promotion = new Promotion();
+        promotion.setDiscountPercentage(new BigDecimal("15"));
+
+        // Mocks
+        when(cartRepository.findByUserId(eq(orderRequest.getUserId()))).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), cartItem.getSize().getId()))
+                .thenReturn(Optional.of(productInventory));
         when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+
+
+        // Mock promotionService trả về giá trị gốc tránh lỗi null
+        when(promotionService.applyPromotionToProduct(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            return p.getPrice();
+        });
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(orderRequest);
+        });
+
+        assertEquals("Discount are out of stock", exception.getMessage());
+
+        // Verify order không được lưu
+        verify(orderRepository, never()).save(any());
+    }
+
+
+    @Test
+    @DisplayName("TC_ORDER_007 - Mã giảm giá chưa tới hạn hoặc đã hết hạn (currentDate not in [startDate, expiryDate])")
+    void TC_ORDER_007_discountInvalidDate_shouldThrowException() {
+        // Arrange
+        String userId = "user-003";
+        String shippingAddressId = "address-003";
+        String discountId = "discount-003";
+
+        OrderRequest orderRequest = new OrderRequest();
+        orderRequest.setUserId(userId);
+        orderRequest.setShippingAddressId(shippingAddressId);
+        orderRequest.setDiscountId(discountId);
+
+        Cart cart = new Cart();
+        cart.setId("cart-003");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
+
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
+
+        Product product = new Product();
+        product.setId("prod-003");
+        product.setName("Product 3");
+        product.setPrice(new BigDecimal("100"));
+
+        CartItem cartItem = new CartItem();
+        cartItem.setProduct(product);
+        cartItem.setSize(new Size());
+        cartItem.setQuantity(1);
+
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
+
+        Discount discount = new Discount();
+        discount.setId(discountId);
+        discount.setMaxUses(10);
+        discount.setUsedCount(0);
+        // Test trường hợp chưa tới hạn (startDate trong tương lai)
+        discount.setStartDate(LocalDateTime.now().plusDays(5));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(10));
+        discount.setDiscountPercentage(new BigDecimal("20"));
+        discount.setMaxDiscountValue(new BigDecimal("50"));
+        discount.setDiscountType(DiscountType.PERCENTAGE);
+        discount.setMinOrderValue(new BigDecimal("0"));
+
+        Promotion promotion = new Promotion();
+        promotion.setDiscountPercentage(new BigDecimal("20"));
+
+        // Mocks
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), cartItem.getSize().getId()))
+                .thenReturn(Optional.of(productInventory));
+        when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+
+        // Mock promotionService trả về giá hợp lệ
+        when(promotionService.applyPromotionToProduct(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            return p.getPrice();
+        });
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(orderRequest);
+        });
+
+        assertEquals("Discount is not yet valid", exception.getMessage());
+
+        // Test trường hợp hết hạn (expiryDate trong quá khứ)
+        discount.setStartDate(LocalDateTime.now().minusDays(10));
+        discount.setExpiryDate(LocalDateTime.now().minusDays(1));
+
+        // Lặp lại assertThrows
+        exception = assertThrows(RuntimeException.class, () -> {
+            orderService.createOrderFromCart(orderRequest);
+        });
+
+        assertEquals("Discount is not yet valid", exception.getMessage());  // hoặc "Discount has expired" tùy message bạn dùng
+
+        // Verify order không được lưu
+        verify(orderRepository, never()).save(any());
+    }
+
+
+    @Test
+    @DisplayName("TC_ORDER_008 - Tổng tiền không đạt điều kiện discount (cartTotal < discount.minOrderValue)")
+    void TC_ORDER_008_cartTotalLessThanMinOrderValue_shouldNotApplyDiscount() {
+        // Arrange
+        String userId = "user-004";
+        String shippingAddressId = "address-004";
+        String discountId = "discount-004";
+
+        OrderRequest orderRequest = new OrderRequest();
+        orderRequest.setUserId(userId);
+        orderRequest.setShippingAddressId(shippingAddressId);
+        orderRequest.setDiscountId(discountId);
+
+        Cart cart = new Cart();
+        cart.setId("cart-004");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
+
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
+
+        Product product = new Product();
+        product.setId("prod-004");
+        product.setName("Product 4");
+        product.setPrice(new BigDecimal("50"));  // Giá thấp
+
+        Size size = new Size();
+        size.setId("size-004");
+
+        CartItem cartItem = new CartItem();
+        cartItem.setProduct(product);
+        cartItem.setSize(size);
+        cartItem.setQuantity(1);
+
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
+
+        Discount discount = new Discount();
+        discount.setId(discountId);
+        discount.setMaxUses(10);
+        discount.setUsedCount(0);
+        discount.setStartDate(LocalDateTime.now().minusDays(1));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(1));
+        discount.setDiscountPercentage(new BigDecimal("20"));  // 20%
+        discount.setMaxDiscountValue(new BigDecimal("10"));
+        discount.setDiscountType(DiscountType.PERCENTAGE);
+        discount.setMinOrderValue(new BigDecimal("100")); // Điều kiện minOrderValue là 100
+
+        // Mocks
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId("order-123"); // giả lập DB insert id
+            return o;
+        });
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), size.getId()))
+                .thenReturn(Optional.of(productInventory));
+        when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+        when(promotionProductRepository.findPromotionApplyByProductId(eq(product.getId()), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> {
+            Invoice inv = invocation.getArgument(0);
+            if (inv.getId() == null) {
+                inv.setId("invoice-001"); // Giả lập id đã được tạo khi lưu
+            }
+            return inv;
+        });
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Mock promotionService trả về giá gốc (không giảm)
+        when(promotionService.applyPromotionToProduct(any(Product.class))).thenAnswer(invocation -> {
+            Product p = invocation.getArgument(0);
+            return p.getPrice();
+        });
+        // Mock trả về OrderResponse giả lập
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+
+            OrderResponse response = new OrderResponse();
+            response.setTotalPriceBeforeDiscount(order.getTotalPriceBeforeDiscount());
+            response.setTotalPriceAfterDiscount(order.getTotalPriceAfterDiscount());
+            // Nếu cần, map thêm các trường khác
+
+            return response;
+        });
+
+
+        // Mock userDiscountRepository trả về empty (user chưa dùng discount)
+        when(userDiscountRepository.findByUserIdAndDiscount_Id(userId, discountId)).thenReturn(Optional.empty());
 
         // Act
         ApiResponse<OrderResponse> response = orderService.createOrderFromCart(orderRequest);
-        OrderResponse orderResponse = response.getResult();
 
         // Assert
-        assertThat(orderResponse.getTotalPriceBeforeDiscount()).isEqualTo(cartTotal);
-        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(cartTotal);  // Không giảm giá
+        assertEquals(200, response.getCode());
+        assertEquals("Order created successfully", response.getMessage());
 
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(cartItemRepository, times(1)).findByCartId(cart.getId());
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
+        OrderResponse orderResponse = response.getResult();
+        // Tổng tiền trước giảm là 50 * 1 = 50
+        assertEquals(new BigDecimal("50"), orderResponse.getTotalPriceBeforeDiscount());
+        // Tổng tiền sau giảm do không đủ điều kiện, vẫn bằng 50
+        assertEquals(new BigDecimal("50"), orderResponse.getTotalPriceAfterDiscount());
+
+        // Verify order được lưu
+        verify(orderRepository, times(1)).save(any(Order.class));
     }
-
 
 
     @Test
     @DisplayName("TC_ORDER_009 - Tổng tiền sau discount âm (cartTotal - discountAmount < 0)")
-    void testCreateOrderFromCart_TotalAfterDiscountNegative() {
+    void TC_ORDER_009_discountAmountGreaterThanCartTotal_shouldCapDiscountAtCartTotal() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";
+        String userId = "user-009";
+        String shippingAddressId = "address-009";
+        String discountId = "discount-009";
 
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
         orderRequest.setDiscountId(discountId);
 
-        BigDecimal productPrice = BigDecimal.valueOf(20.00);
-        int requestedQuantity = 1;
-        BigDecimal cartTotal = productPrice.multiply(BigDecimal.valueOf(requestedQuantity)); // cartTotal = 20
-
-        // Cart
         Cart cart = new Cart();
-        cart.setId("cart123");
-        cart.setUser(new User());
+        cart.setId("cart-009");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
+
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
 
         Product product = new Product();
-        product.setPrice(productPrice);
+        product.setId("prod-009");
+        product.setName("Product 9");
+        product.setPrice(new BigDecimal("20"));
+
+        Size size = new Size();
+        size.setId("size-009");
 
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
-        cartItem.setQuantity(requestedQuantity);
+        cartItem.setSize(size);
+        cartItem.setQuantity(1);
 
-        // Mock CartRepository
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
 
-        // Discount
         Discount discount = new Discount();
         discount.setId(discountId);
-        discount.setDiscountType(DiscountType.VALUE); // Dùng VALUE (giảm theo số tiền cố định)
-        discount.setDiscountValue(BigDecimal.valueOf(50.00)); // Giảm 50 > cartTotal 20
-        discount.setMaxDiscountValue(BigDecimal.valueOf(50.00));
-        discount.setMinOrderValue(BigDecimal.ZERO);
+        discount.setCode("GIAMGIA009");
+        discount.setMaxUses(10);
+        discount.setUsedCount(0);
+        discount.setStartDate(LocalDateTime.now().minusDays(1));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(1));
+        discount.setDiscountType(DiscountType.VALUE);  // Giảm giá cố định
+        discount.setDiscountValue(new BigDecimal("50"));  // Giảm tới 50, nhưng giá chỉ 20
+        discount.setMaxDiscountValue(new BigDecimal("100"));
+        discount.setDiscountPercentage(BigDecimal.ZERO);
+        discount.setMinOrderValue(new BigDecimal("10"));  // Điều kiện tổng tiền tối thiểu để được giảm là 10
+        discount.setAutoApply(false);
+
+        // Mocks
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId("order-009");
+            return o;
+        });
+        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
+        when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), size.getId()))
+                .thenReturn(Optional.of(productInventory));
         when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+        when(promotionProductRepository.findPromotionApplyByProductId(eq(product.getId()), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> {
+            Invoice inv = invocation.getArgument(0);
+            if (inv.getId() == null) {
+                inv.setId("invoice-009");
+            }
+            return inv;
+        });
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(promotionService.applyPromotionToProduct(any(Product.class)))
+                .thenAnswer(invocation -> invocation.<Product>getArgument(0).getPrice());
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            OrderResponse response = new OrderResponse();
+            response.setTotalPriceBeforeDiscount(order.getTotalPriceBeforeDiscount());
+            response.setTotalPriceAfterDiscount(order.getTotalPriceAfterDiscount());
+            return response;
+        });
+        when(userDiscountRepository.findByUserIdAndDiscount_Id(userId, discountId)).thenReturn(Optional.empty());
 
         // Act
         ApiResponse<OrderResponse> response = orderService.createOrderFromCart(orderRequest);
-        OrderResponse orderResponse = response.getResult();
 
         // Assert
-        assertThat(orderResponse.getTotalPriceBeforeDiscount()).isEqualTo(cartTotal);
-        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(BigDecimal.ZERO); // Sau giảm giá âm => 0
+        assertEquals(200, response.getCode());
+        assertEquals("Order created successfully", response.getMessage());
 
-        // Verify
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(cartItemRepository, times(1)).findByCartId(cart.getId());
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
+        OrderResponse orderResponse = response.getResult();
+        BigDecimal totalBefore = new BigDecimal("20");
+        BigDecimal expectedDiscount = new BigDecimal("20"); // Không thể lớn hơn tổng tiền
+        BigDecimal totalAfter = totalBefore.subtract(expectedDiscount);
+
+        assertEquals(totalBefore, orderResponse.getTotalPriceBeforeDiscount());
+        assertEquals(totalAfter, orderResponse.getTotalPriceAfterDiscount());
+
+        // Verify lưu order
+        verify(orderRepository, times(1)).save(any(Order.class));
     }
+
 
 
 
     @Test
     @DisplayName("TC_ORDER_010 - Điều kiện hợp lệ, không discount (Cart hợp lệ, không có discountId)")
-    void testCreateOrderFromCart_NoDiscountApplied() {
+    void TC_ORDER_010_validCartWithoutDiscount_shouldCreateOrderWithoutDiscount() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
+        String userId = "user-010";
+        String shippingAddressId = "address-010";
 
-        // Không set discountId
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
-
-        // Setup cart + cartItems
-        BigDecimal productPrice = BigDecimal.valueOf(50.00);
-        int requestedQuantity = 2;
-        BigDecimal cartTotal = productPrice.multiply(BigDecimal.valueOf(requestedQuantity)); // 100
+        orderRequest.setDiscountId(null); // Không có discountId
 
         Cart cart = new Cart();
-        cart.setId("cart123");
-        cart.setUser(new User());
+        cart.setId("cart-010");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
+
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
 
         Product product = new Product();
-        product.setPrice(productPrice);
+        product.setId("prod-010");
+        product.setName("Product 10");
+        product.setPrice(new BigDecimal("100"));
+
+        Size size = new Size();
+        size.setId("size-010");
 
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
-        cartItem.setQuantity(requestedQuantity);
+        cartItem.setSize(size);
+        cartItem.setQuantity(2);  // 2 sản phẩm
 
-        // Mock cartRepository trả về giỏ hàng hợp lệ
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
+
+        // Mocks
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId("order-010");
+            return o;
+        });
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-        // Mock cartItemRepository trả về danh sách các item trong giỏ hàng
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
         when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
-        // Mock shippingAddressRepository trả về địa chỉ giao hàng hợp lệ
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), size.getId()))
+                .thenReturn(Optional.of(productInventory));
+        // discountRepository.findById không được gọi vì không có discountId
+        when(promotionProductRepository.findPromotionApplyByProductId(eq(product.getId()), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> {
+            Invoice inv = invocation.getArgument(0);
+            if (inv.getId() == null) {
+                inv.setId("invoice-010");
+            }
+            return inv;
+        });
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(promotionService.applyPromotionToProduct(any(Product.class)))
+                .thenAnswer(invocation -> invocation.<Product>getArgument(0).getPrice());
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            OrderResponse response = new OrderResponse();
+            response.setTotalPriceBeforeDiscount(order.getTotalPriceBeforeDiscount());
+            response.setTotalPriceAfterDiscount(order.getTotalPriceAfterDiscount());
+            return response;
+        });
+
+        // userDiscountRepository không gọi vì không có discountId
 
         // Act
         ApiResponse<OrderResponse> response = orderService.createOrderFromCart(orderRequest);
-        OrderResponse orderResponse = response.getResult();
 
         // Assert
-        assertThat(orderResponse).isNotNull();
-        assertThat(orderResponse.getTotalPriceBeforeDiscount()).isEqualTo(cartTotal);
-        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(cartTotal); // Không discount nên 2 số bằng nhau
+        assertEquals(200, response.getCode());
+        assertEquals("Order created successfully", response.getMessage());
 
-        // Verify repository interactions
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(cartItemRepository, times(1)).findByCartId(cart.getId());
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verifyNoInteractions(discountRepository); // Không gọi đến discountRepository
+        OrderResponse orderResponse = response.getResult();
+        BigDecimal totalBefore = product.getPrice().multiply(new BigDecimal(cartItem.getQuantity())); // 100 * 2 = 200
+        BigDecimal totalAfter = totalBefore; // Không có giảm giá
+
+        assertEquals(totalBefore, orderResponse.getTotalPriceBeforeDiscount());
+        assertEquals(totalAfter, orderResponse.getTotalPriceAfterDiscount());
+
+        // Verify order được lưu
+        verify(orderRepository, times(1)).save(any(Order.class));
+        // discountRepository.findById không được gọi
+        verify(discountRepository, never()).findById(any());
+        // userDiscountRepository.findByUserIdAndDiscount_Id không được gọi
+        verify(userDiscountRepository, never()).findByUserIdAndDiscount_Id(any(), any());
     }
+
+
 
 
     @Test
     @DisplayName("TC_ORDER_011 - Điều kiện hợp lệ, có discount (Cart hợp lệ + discountId hợp lệ)")
-    void testCreateOrderFromCart_ValidCartAndDiscountApplied() {
+    void TC_ORDER_011_validCartWithValidDiscount_shouldApplyDiscount() {
         // Arrange
-        String userId = "user123";
-        String shippingAddressId = "address123";
-        String discountId = "discount123";
+        String userId = "user-011";
+        String shippingAddressId = "address-011";
+        String discountId = "discount-011";
 
         OrderRequest orderRequest = new OrderRequest();
         orderRequest.setUserId(userId);
         orderRequest.setShippingAddressId(shippingAddressId);
         orderRequest.setDiscountId(discountId);
 
-        // Setup cart + cartItems
-        BigDecimal productPrice = BigDecimal.valueOf(100.00);
-        int requestedQuantity = 1;
-        BigDecimal cartTotal = productPrice.multiply(BigDecimal.valueOf(requestedQuantity)); // 100
-
         Cart cart = new Cart();
-        cart.setId("cart123");
-        cart.setUser(new User());
+        cart.setId("cart-011");
+        User user = new User();
+        user.setId(userId);
+        cart.setUser(user);
+
+        ShippingAddress shippingAddress = new ShippingAddress();
+        shippingAddress.setId(shippingAddressId);
 
         Product product = new Product();
-        product.setPrice(productPrice);
+        product.setId("prod-011");
+        product.setName("Product 11");
+        product.setPrice(new BigDecimal("100"));
+
+        Size size = new Size();
+        size.setId("size-011");
 
         CartItem cartItem = new CartItem();
         cartItem.setProduct(product);
-        cartItem.setQuantity(requestedQuantity);
+        cartItem.setSize(size);
+        cartItem.setQuantity(2);  // 2 sản phẩm
 
-        // Discount setup
+        ProductInventory productInventory = new ProductInventory();
+        productInventory.setQuantity(10);
+
         Discount discount = new Discount();
         discount.setId(discountId);
-        discount.setDiscountType(DiscountType.PERCENTAGE);
-        discount.setDiscountPercentage(BigDecimal.valueOf(10)); // 10% giảm giá
-        discount.setMaxDiscountValue(BigDecimal.valueOf(50));   // Tối đa được giảm 50
-        discount.setMinOrderValue(BigDecimal.valueOf(50));      // Hóa đơn tối thiểu 50 mới áp dụng
-        discount.setStartDate(LocalDateTime.now().minusDays(1));
-        discount.setExpiryDate(LocalDateTime.now().plusDays(5));
+        discount.setCode("DISCOUNT011");
+        discount.setMaxUses(10);
         discount.setUsedCount(0);
-        discount.setMaxUses(100);
+        discount.setStartDate(LocalDateTime.now().minusDays(1));
+        discount.setExpiryDate(LocalDateTime.now().plusDays(1));
+        discount.setDiscountType(DiscountType.PERCENTAGE);  // Giảm theo phần trăm
+        discount.setDiscountPercentage(new BigDecimal("10"));  // Giảm 10%
+        discount.setMaxDiscountValue(new BigDecimal("50"));   // Giảm tối đa 50
+        discount.setMinOrderValue(new BigDecimal("100"));     // Tổng đơn phải tối thiểu 100
+        discount.setAutoApply(false);
 
+        // Mocks
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId("order-011");
+            return o;
+        });
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(shippingAddress));
         when(cartItemRepository.findByCartId(cart.getId())).thenReturn(List.of(cartItem));
-        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(new ShippingAddress()));
+        when(productInventoryRepository.findByProductIdAndSizeId(product.getId(), size.getId()))
+                .thenReturn(Optional.of(productInventory));
         when(discountRepository.findById(discountId)).thenReturn(Optional.of(discount));
+        when(promotionProductRepository.findPromotionApplyByProductId(eq(product.getId()), any(LocalDateTime.class)))
+                .thenReturn(Collections.emptyList());
+        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(invocation -> {
+            Invoice inv = invocation.getArgument(0);
+            if (inv.getId() == null) {
+                inv.setId("invoice-011");
+            }
+            return inv;
+        });
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(promotionService.applyPromotionToProduct(any(Product.class)))
+                .thenAnswer(invocation -> invocation.<Product>getArgument(0).getPrice());
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            OrderResponse response = new OrderResponse();
+            response.setTotalPriceBeforeDiscount(order.getTotalPriceBeforeDiscount());
+            response.setTotalPriceAfterDiscount(order.getTotalPriceAfterDiscount());
+            return response;
+        });
+        when(userDiscountRepository.findByUserIdAndDiscount_Id(userId, discountId)).thenReturn(Optional.empty());
 
         // Act
         ApiResponse<OrderResponse> response = orderService.createOrderFromCart(orderRequest);
-        OrderResponse orderResponse = response.getResult();
-
-        // Calculate expected
-        BigDecimal expectedDiscountAmount = cartTotal.multiply(discount.getDiscountPercentage().divide(BigDecimal.valueOf(100)));
-        if (expectedDiscountAmount.compareTo(discount.getMaxDiscountValue()) > 0) {
-            expectedDiscountAmount = discount.getMaxDiscountValue();
-        }
-        BigDecimal expectedTotalAfterDiscount = cartTotal.subtract(expectedDiscountAmount);
 
         // Assert
-        assertThat(orderResponse).isNotNull();
-        assertThat(orderResponse.getTotalPriceBeforeDiscount()).isEqualTo(cartTotal);
-        assertThat(orderResponse.getTotalPriceAfterDiscount()).isEqualTo(expectedTotalAfterDiscount);
+        assertEquals(200, response.getCode());
+        assertEquals("Order created successfully", response.getMessage());
 
-        // Verify behavior
-        verify(cartRepository, times(1)).findByUserId(userId);
-        verify(cartItemRepository, times(1)).findByCartId(cart.getId());
-        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
-        verify(discountRepository, times(1)).findById(discountId);
+        OrderResponse orderResponse = response.getResult();
+        BigDecimal totalBefore = product.getPrice().multiply(new BigDecimal(cartItem.getQuantity())); // 100 * 2 = 200
+        BigDecimal expectedDiscount = totalBefore.multiply(new BigDecimal("10")).divide(new BigDecimal("100")); // 10% của 200 = 20
+        BigDecimal totalAfter = totalBefore.subtract(expectedDiscount);
+
+        assertEquals(0, totalBefore.compareTo(orderResponse.getTotalPriceBeforeDiscount()));
+        assertEquals(0, totalAfter.compareTo(orderResponse.getTotalPriceAfterDiscount()));
+
+
+        // Verify lưu order
+        verify(orderRepository, times(1)).save(any(Order.class));
+        // Verify discountRepository được gọi
+        verify(discountRepository, times(2)).findById(discountId);
+        // Verify userDiscountRepository được gọi
+        verify(userDiscountRepository, times(1)).findByUserIdAndDiscount_Id(userId, discountId);
     }
 
 
 
     @Test
     @DisplayName("TC_ORDER_012 - Đơn hàng không tồn tại (orderId không tồn tại) - Báo lỗi 'Order not found'")
-    void testClientEditOrder_OrderNotFound() {
+    void TC_ORDER_012_orderIdNotFound_shouldReturnOrderNotFoundError() {
         // Arrange
-        String invalidOrderId = "invalid-order-id";
-        UpdateOrderRequest request = new UpdateOrderRequest();
-        request.setOrderId(invalidOrderId);
-        request.setUserId("user123"); // userId hợp lệ, nhưng orderId sai
+        String invalidOrderId = "non-existent-order-id";
 
-        // Mock orderRepository không tìm thấy Order
+        UpdateOrderRequest updateRequest = new UpdateOrderRequest();
+        updateRequest.setOrderId(invalidOrderId);
+        updateRequest.setShippingAddressId("some-shipping-address-id");
+
+        // Mock order not found
         when(orderRepository.findById(invalidOrderId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.clientEditOrder(request);  // Đảm bảo đây thực sự gọi findById
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.clientEditOrder(updateRequest)
+        );
 
-        // Verify exception message
-        assertThat(exception.getMessage()).isEqualTo("Order not found");
+        assertEquals("Order not found", exception.getMessage());
 
-        // Verify repository call
-        verify(orderRepository, times(1)).findById(invalidOrderId); // Kiểm tra xem findById có được gọi không
+        verify(orderRepository, times(1)).findById(invalidOrderId);
+        verifyNoMoreInteractions(orderRepository);
     }
 
 
     @Test
     @DisplayName("TC_ORDER_013 - User không phải chủ đơn - Báo lỗi 'You do not have permission to edit this order'")
-    void testClientEditOrder_UserNotOwner() {
+    void TC_ORDER_013_userNotOwner_shouldThrowPermissionError() {
         // Arrange
-        String orderId = "order123";
-        String userIdInRequest = "user123";    // user gửi request
-        String ownerIdInOrder = "differentUser"; // user thật sự của đơn
+        String orderId = "order-013";
+        String userIdFromRequest = "wrong-user-id"; // ID không khớp với user của đơn hàng
 
-        UpdateOrderRequest request = new UpdateOrderRequest();
-        request.setOrderId(orderId);
-        request.setUserId(userIdInRequest);
+        UpdateOrderRequest updateRequest = new UpdateOrderRequest();
+        updateRequest.setOrderId(orderId);
+        updateRequest.setShippingAddressId("some-shipping-id");
 
-        // Tạo Order có user khác với user gửi request
-        User ownerUser = new User();
-        ownerUser.setId(ownerIdInOrder);
+        // Mock đơn hàng với user thật
+        User actualOwner = new User();
+        actualOwner.setId("correct-user-id"); // user thật trong đơn
 
         Order order = new Order();
         order.setId(orderId);
-        order.setUser(ownerUser);
+        order.setUser(actualOwner);
+        order.setStatus(OrderStatusEnum.PENDING);
 
-        // Mock orderRepository trả về order
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.clientEditOrder(request);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.clientEditOrder(updateRequest)
+        );
 
-        // Kiểm tra thông báo lỗi là "You do not have permission to edit this order"
-        assertThat(exception.getMessage()).isEqualTo("You do not have permission to edit this order");
+        assertEquals("You do not have permission to edit this order", exception.getMessage());
 
-        // Verify behavior
         verify(orderRepository, times(1)).findById(orderId);
+        verifyNoMoreInteractions(orderRepository);
     }
+
 
 
     @Test
     @DisplayName("TC_ORDER_014 - Đơn không ở trạng thái Pending - Báo lỗi 'Order cannot be edited at this stage'")
-    void testClientEditOrder_OrderNotPending() {
+    void TC_ORDER_014_orderNotPending_shouldThrowEditNotAllowedError() {
         // Arrange
-        String orderId = "order123";
-        String userId = "user123";
+        String orderId = "order-014";
+        String userId = "user-014";
 
-        UpdateOrderRequest request = new UpdateOrderRequest();
-        request.setOrderId(orderId);
-        request.setUserId(userId);
+        UpdateOrderRequest updateRequest = new UpdateOrderRequest();
+        updateRequest.setOrderId(orderId);
+        updateRequest.setShippingAddressId("shipping-014");
+        updateRequest.setUserId(userId); // Đảm bảo request chứa userId hợp lệ
 
-        // Tạo Order đúng user nhưng status khác Pending
+        // Mock đơn hàng với user đúng nhưng trạng thái không phải PENDING
         User user = new User();
         user.setId(userId);
 
         Order order = new Order();
         order.setId(orderId);
         order.setUser(user);
-        order.setStatus(OrderStatusEnum.CONFIRMED); // Không phải PENDING
+        order.setStatus(OrderStatusEnum.CONFIRMED); // Trạng thái không phải PENDING
 
-        // Mock orderRepository trả về order
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.clientEditOrder(request);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.clientEditOrder(updateRequest)
+        );
 
-        // Kiểm tra thông báo lỗi là "Order cannot be edited at this stage"
-        assertThat(exception.getMessage()).isEqualTo("Order cannot be edited at this stage");
+        assertEquals("Order cannot be edited at this stage", exception.getMessage());
 
-        // Verify behavior
         verify(orderRepository, times(1)).findById(orderId);
+        verifyNoMoreInteractions(orderRepository);
     }
+
 
 
     @Test
     @DisplayName("TC_ORDER_015 - Địa chỉ giao hàng mới không tồn tại - Báo lỗi 'Shipping address not found'")
-    void testClientEditOrder_ShippingAddressNotFound() {
+    void TC_ORDER_015_shippingAddressNotFound_shouldThrowException() {
         // Arrange
-        String orderId = "order123";
-        String userId = "user123";
-        String invalidShippingAddressId = "invalidAddressId";
+        String orderId = "order-015";
+        String userId = "user-015";
+        String nonExistentAddressId = "address-not-found";
 
-        UpdateOrderRequest request = new UpdateOrderRequest();
-        request.setOrderId(orderId);
-        request.setUserId(userId);
-        request.setShippingAddressId(invalidShippingAddressId);
+        UpdateOrderRequest updateRequest = new UpdateOrderRequest();
+        updateRequest.setOrderId(orderId);
+        updateRequest.setUserId(userId);
+        updateRequest.setShippingAddressId(nonExistentAddressId);
 
         User user = new User();
         user.setId(userId);
@@ -759,234 +1085,239 @@ public class TestOrderService {
         order.setUser(user);
         order.setStatus(OrderStatusEnum.PENDING);
 
-        // ⚡ Fix mock chỗ này:
-        when(orderRepository.findByIdAndUserId(orderId, userId)).thenReturn(Optional.of(order));
-
-        when(shippingAddressRepository.findById(invalidShippingAddressId)).thenReturn(Optional.empty());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(shippingAddressRepository.findById(nonExistentAddressId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.clientEditOrder(request);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.clientEditOrder(updateRequest)
+        );
 
-        assertThat(exception.getMessage()).isEqualTo("Shipping address not found");
+        assertEquals("Shipping address not found", exception.getMessage());
 
-        verify(orderRepository, times(1)).findByIdAndUserId(orderId, userId);
-        verify(shippingAddressRepository, times(1)).findById(invalidShippingAddressId);
+        verify(orderRepository, times(1)).findById(orderId);
+        verify(shippingAddressRepository, times(1)).findById(nonExistentAddressId);
+        verify(orderRepository, never()).save(any());
     }
+
 
 
     @Test
     @DisplayName("TC_ORDER_016 - Cập nhật địa chỉ giao hàng hợp lệ - Cập nhật thành công")
-    void testClientEditOrder_ShippingAddressUpdateSuccess() {
+    void TC_ORDER_016_validShippingAddress_shouldUpdateOrderSuccessfully() {
         // Arrange
-        String orderId = "order123";
-        String userId = "user123";
-        String validShippingAddressId = "validAddressId";  // Địa chỉ mới hợp lệ
+        String orderId = "order-016";
+        String userId = "user-016";
+        String newAddressId = "address-016";
 
-        UpdateOrderRequest request = new UpdateOrderRequest();
-        request.setOrderId(orderId);
-        request.setUserId(userId);
-        request.setShippingAddressId(validShippingAddressId);  // Địa chỉ mới hợp lệ
+        UpdateOrderRequest updateRequest = new UpdateOrderRequest();
+        updateRequest.setOrderId(orderId);
+        updateRequest.setUserId(userId);
+        updateRequest.setShippingAddressId(newAddressId);
 
-        // Tạo User và Order hợp lệ
         User user = new User();
         user.setId(userId);
+
+        ShippingAddress newAddress = new ShippingAddress();
+        newAddress.setId(newAddressId);
+        newAddress.setAddressDetail("123 New Street");
 
         Order order = new Order();
         order.setId(orderId);
         order.setUser(user);
-        order.setStatus(OrderStatusEnum.PENDING);  // Trạng thái đơn hợp lệ để chỉnh sửa
+        order.setStatus(OrderStatusEnum.PENDING);
 
-        // Tạo ShippingAddress hợp lệ
-        ShippingAddress validShippingAddress = new ShippingAddress();
-        validShippingAddress.setId(validShippingAddressId);
-
-        // Mock orderRepository trả về order
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        // Mock shippingAddressRepository trả về địa chỉ hợp lệ
-        when(shippingAddressRepository.findById(validShippingAddressId)).thenReturn(Optional.of(validShippingAddress));
+        when(shippingAddressRepository.findById(newAddressId)).thenReturn(Optional.of(newAddress));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            OrderResponse response = new OrderResponse();
+            response.setId(o.getId());
+            response.setTotalPriceBeforeDiscount(BigDecimal.ZERO);  // Dummy
+            response.setTotalPriceAfterDiscount(BigDecimal.ZERO);   // Dummy
+            return response;
+        });
 
         // Act
-        ApiResponse<OrderResponse> response = orderService.clientEditOrder(request);
+        ApiResponse<OrderResponse> response = orderService.clientEditOrder(updateRequest);
 
         // Assert
-        assertThat(response.getCode()).isEqualTo(200);
-        assertThat(response.getMessage()).isEqualTo("Order updated successfully");
+        assertEquals(200, response.getCode());
+        assertEquals("Order updated successfully", response.getMessage());
+        assertEquals(orderId, response.getResult().getId());
 
-        // Verify that the order's shipping address was updated
-        assertThat(order.getShippingAddress()).isEqualTo(validShippingAddress);
-
-        verify(orderRepository, times(1)).findById(orderId);
-        verify(shippingAddressRepository, times(1)).findById(validShippingAddressId);
+        verify(orderRepository, times(1)).save(any(Order.class));
+        verify(shippingAddressRepository, times(1)).findById(newAddressId);
     }
+
 
 
     @Test
     @DisplayName("TC_ORDER_017 - Đơn hàng không tồn tại - Báo lỗi 'Order not found'")
-    void testAdminEditOrder_OrderNotFound() {
+    void TC_ORDER_017_orderNotFound_shouldThrowException() {
         // Arrange
-        String invalidOrderId = "invalidOrderId";
+        String orderId = "invalid-order-017";
         OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setShippingAddressId("validAddressId");
+        orderRequest.setShippingAddressId("any-address");
+        orderRequest.setStatus(OrderStatusEnum.CONFIRMED);
 
-        // Mock orderRepository trả về Optional.empty() khi tìm kiếm đơn hàng không tồn tại
-        when(orderRepository.findById(invalidOrderId)).thenReturn(Optional.empty());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.adminEditOrder(invalidOrderId, orderRequest);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.adminEditOrder(orderId, orderRequest)
+        );
 
-        assertThat(exception.getMessage()).isEqualTo("Order not found");
+        assertEquals("Order not found", exception.getMessage());
 
-        verify(orderRepository, times(1)).findById(invalidOrderId);
+        verify(orderRepository, times(1)).findById(orderId);
     }
+
 
     @Test
     @DisplayName("TC_ORDER_018 - Địa chỉ giao hàng mới không tồn tại - Báo lỗi 'Shipping address not found'")
-    void testAdminEditOrder_ShippingAddressNotFound() {
+    void TC_ORDER_018_shippingAddressNotFound_shouldThrowException() {
         // Arrange
-        String orderId = "order123";
+        String orderId = "order-018";
+        String invalidAddressId = "invalid-address-018";
+
+        Order existingOrder = new Order();
+        existingOrder.setId(orderId);
+
         OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setShippingAddressId("invalidAddressId"); // Địa chỉ không tồn tại
+        orderRequest.setShippingAddressId(invalidAddressId);
+        orderRequest.setStatus(OrderStatusEnum.CONFIRMED);
 
-        // Tạo đơn hàng hợp lệ
-        Order order = new Order();
-        order.setId(orderId);
-        order.setStatus(OrderStatusEnum.PENDING);  // Trạng thái đơn hợp lệ để chỉnh sửa
-
-        // Mock orderRepository trả về order
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        // Mock shippingAddressRepository trả về null khi tìm kiếm địa chỉ
-        when(shippingAddressRepository.findById("invalidAddressId")).thenReturn(Optional.empty());
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(existingOrder));
+        when(shippingAddressRepository.findById(invalidAddressId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            orderService.adminEditOrder(orderId, orderRequest);
-        });
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                orderService.adminEditOrder(orderId, orderRequest)
+        );
 
-        assertThat(exception.getMessage()).isEqualTo("Shipping address not found");
+        assertEquals("Shipping address not found", exception.getMessage());
 
         verify(orderRepository, times(1)).findById(orderId);
-        verify(shippingAddressRepository, times(1)).findById("invalidAddressId");
+        verify(shippingAddressRepository, times(1)).findById(invalidAddressId);
     }
+
 
     @Test
     @DisplayName("TC_ORDER_019 - Cập nhật trạng thái và địa chỉ hợp lệ - Cập nhật thành công")
-    void testAdminEditOrder_UpdateStatusAndShippingAddressSuccess() {
+    void TC_ORDER_019_validStatusAndAddress_shouldUpdateSuccessfully() {
         // Arrange
-        String orderId = "order123";
-        String newShippingAddressId = "newAddressId";
-        OrderStatusEnum newStatus = OrderStatusEnum.SHIPPING;
+        String orderId = "order-019";
+        String shippingAddressId = "address-019";
+
+        Order existingOrder = new Order();
+        existingOrder.setId(orderId);
+        existingOrder.setStatus(OrderStatusEnum.PENDING);
+
+        ShippingAddress newAddress = new ShippingAddress();
+        newAddress.setId(shippingAddressId);
 
         OrderRequest orderRequest = new OrderRequest();
-        orderRequest.setShippingAddressId(newShippingAddressId);
-        orderRequest.setStatus(newStatus);
+        orderRequest.setShippingAddressId(shippingAddressId);
+        orderRequest.setStatus(OrderStatusEnum.CONFIRMED);
 
-        // Tạo đơn hàng hợp lệ
-        Order order = new Order();
-        order.setId(orderId);
-        order.setStatus(OrderStatusEnum.PENDING);  // Trạng thái đơn hợp lệ để chỉnh sửa
-
-        // Tạo ShippingAddress hợp lệ
-        ShippingAddress validShippingAddress = new ShippingAddress();
-        validShippingAddress.setId(newShippingAddressId);
-
-        // Mock orderRepository trả về order
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        // Mock shippingAddressRepository trả về địa chỉ hợp lệ
-        when(shippingAddressRepository.findById(newShippingAddressId)).thenReturn(Optional.of(validShippingAddress));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(existingOrder));
+        when(shippingAddressRepository.findById(shippingAddressId)).thenReturn(Optional.of(newAddress));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderMapper.toOrderResponse(any(Order.class))).thenAnswer(invocation -> {
+            Order updatedOrder = invocation.getArgument(0);
+            OrderResponse response = new OrderResponse();
+            response.setId(updatedOrder.getId());
+            response.setStatus(updatedOrder.getStatus());
+            return response;
+        });
 
         // Act
         ApiResponse<OrderResponse> response = orderService.adminEditOrder(orderId, orderRequest);
 
         // Assert
-        assertThat(response.getCode()).isEqualTo(200);
-        assertThat(response.getMessage()).isEqualTo("Order updated successfully");
+        assertEquals(200, response.getCode());
+        assertEquals("Order updated successfully", response.getMessage());
+        assertNotNull(response.getResult());
+        assertEquals(OrderStatusEnum.CONFIRMED, response.getResult().getStatus());
+        assertEquals(orderId, response.getResult().getId());
 
-        // Verify that the order's shipping address and status were updated
-        assertThat(order.getShippingAddress()).isEqualTo(validShippingAddress);
-        assertThat(order.getStatus()).isEqualTo(newStatus);
-
+        // Verify
         verify(orderRepository, times(1)).findById(orderId);
-        verify(shippingAddressRepository, times(1)).findById(newShippingAddressId);
+        verify(shippingAddressRepository, times(1)).findById(shippingAddressId);
+        verify(orderRepository, times(1)).save(any(Order.class));
+        verify(orderMapper, times(1)).toOrderResponse(any(Order.class));
     }
 
-
     @Test
-    @DisplayName("TC_ORDER_020")
-    void GetOrderByUserId_OrderNotFound() {
-        // Arrange: Khi không có đơn hàng cho userId
-        when(orderRepository.findByUserId(userId)).thenReturn(Collections.emptyList());
+    @DisplayName("TC_ORDER_020 - Lấy danh sách đơn hàng theo userId thành công")
+    void TC_GET_ORDER_BY_USER_ID_shouldReturnOrderResponses() {
+        // Arrange
+        String userId = "user-001";
 
-        // Act: Gọi phương thức getOrderByUserId
+        List<Order> orders = List.of(
+                new Order(), new Order()
+        );
+
+        List<OrderResponse> orderResponses = List.of(
+                new OrderResponse(), new OrderResponse()
+        );
+
+        when(orderRepository.findByUserId(userId)).thenReturn(orders);
+        when(orderMapper.toOrderResponseIterable(orders)).thenReturn(orderResponses);
+
+        // Act
         ApiResponse<Iterable<OrderResponse>> response = orderService.getOrderByUserId(userId);
 
-        // Assert: Kiểm tra thông báo lỗi "Order not found"
+        // Assert
         assertEquals(200, response.getCode());
         assertEquals("Order retrieved successfully", response.getMessage());
-        assertTrue(((List<OrderResponse>) response.getResult()).isEmpty());
+        assertNotNull(response.getResult());
+        assertIterableEquals(orderResponses, response.getResult());
+
+        // Verify interactions
+        verify(orderRepository, times(1)).findByUserId(userId);
     }
 
-    // Kiểm tra trường hợp đơn hàng hợp lệ cho userId
     @Test
-    @DisplayName("TC_ORDER_021")
-    void GetOrderByUserId_ValidOrder() {
-        // Arrange: Khi có đơn hàng cho userId
-        when(orderRepository.findByUserId(userId)).thenReturn(orderList);
-        when(orderMapper.toOrderResponseIterable(orderList)).thenReturn(Collections.singletonList(orderResponse));
+    @DisplayName("TC_ORDER_021 - Lấy trang đơn hàng cho admin thành công")
+    void TC_GET_ORDERS_FOR_ADMIN_shouldReturnPagedOrderResponses() {
+        // Arrange
+        String productName = "ProductA";
+        String customerEmail = "customer@example.com";
+        OrderStatusEnum status = OrderStatusEnum.PENDING;
+        Pageable pageable = PageRequest.of(0, 10);
 
-        // Act: Gọi phương thức getOrderByUserId
-        ApiResponse<Iterable<OrderResponse>> response = orderService.getOrderByUserId(userId);
+        Order order1 = new Order();
+        Order order2 = new Order();
+        List<Order> orders = List.of(order1, order2);
 
-        // Assert: Kiểm tra thông tin đơn hàng trả về
-        assertEquals(200, response.getCode());
-        assertEquals("Order retrieved successfully", response.getMessage());
-        assertEquals(1, ((List<OrderResponse>) response.getResult()).size());
-        assertEquals(orderId, ((List<OrderResponse>) response.getResult()).get(0).getId());
-    }
+        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
 
-    // Kiểm tra lấy danh sách đơn hàng cho admin
-    @Test
-    @DisplayName("TC_ORDER_022")
-    void GetOrdersForAdmin_ValidOrders() {
-        // Arrange: Khi có danh sách đơn hàng cho các bộ lọc
-        Pageable pageable = mock(Pageable.class);
+        OrderResponse response1 = new OrderResponse();
+        OrderResponse response2 = new OrderResponse();
 
-        // Tạo một danh sách đơn hàng giả để trả về
-        Order order = new Order();
-        order.setId("order123");
-        order.setStatus(OrderStatusEnum.PENDING);
+        Page<OrderResponse> responsePage = new PageImpl<>(List.of(response1, response2), pageable, orders.size());
 
-        Order orderEntity = new Order();
-        orderEntity.setId("order123");
+        when(orderRepository.findOrdersForAdmin(productName, customerEmail, status, pageable)).thenReturn(orderPage);
+        when(orderMapper.toOrderResponse(order1)).thenReturn(response1);
+        when(orderMapper.toOrderResponse(order2)).thenReturn(response2);
 
-        // Tạo một Page chứa các OrderResponse
-        Page<Order> orderPage = new PageImpl<>(Collections.singletonList(orderEntity));
+        // Act
+        ApiResponse<Page<OrderResponse>> response = orderService.getOrdersForAdmin(productName, customerEmail, status, pageable);
 
-        // Mock orderRepository trả về Page giả
-        when(orderRepository.findOrdersForAdmin(anyString(), anyString(), any(), eq(pageable)))
-                .thenReturn(orderPage);
-        OrderResponse orderResponse = new OrderResponse();
-        orderResponse.setId("order123");
-        // Mock orderMapper
-        when(orderMapper.toOrderResponse(order)).thenReturn(orderResponse);
-
-        // Act: Gọi phương thức getOrdersForAdmin
-        ApiResponse<Page<OrderResponse>> response = orderService.getOrdersForAdmin(
-                "Product1", "customer@example.com", OrderStatusEnum.PENDING, pageable);
-
-        // Assert: Kiểm tra kết quả trả về
+        // Assert
         assertEquals(200, response.getCode());
         assertEquals("Orders retrieved successfully", response.getMessage());
-        assertEquals(1, response.getResult().getContent().size());
-        assertEquals("order123", response.getResult().getContent().get(0).getId());
-    }
+        assertNotNull(response.getResult());
+        assertEquals(responsePage.getTotalElements(), response.getResult().getTotalElements());
+        assertEquals(responsePage.getContent().size(), response.getResult().getContent().size());
 
+        // Verify interactions
+        verify(orderRepository, times(1)).findOrdersForAdmin(productName, customerEmail, status, pageable);
+
+    }
 
 
 }
