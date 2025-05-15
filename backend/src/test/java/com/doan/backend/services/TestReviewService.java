@@ -20,6 +20,7 @@ import com.doan.backend.mapper.ReviewMapper;
 import com.doan.backend.repositories.OrderRepository;
 import com.doan.backend.repositories.ProductRepository;
 import com.doan.backend.repositories.ReviewRepository;
+import com.doan.backend.repositories.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -32,6 +33,7 @@ public class TestReviewService {
     @Mock private ProductRepository productRepository;
     @Mock private OrderRepository orderRepository;
     @Mock private AuthService authService;
+    @Mock private UserRepository userRepository;
     @Mock private ReviewMapper reviewMapper;
     @InjectMocks private ReviewService reviewService;
 

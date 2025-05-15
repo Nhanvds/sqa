@@ -77,7 +77,7 @@ public class TestPromotionService {
 
         // Assert
         assertNotNull(result);
-        assertEquals(200, result.getCode());
+        assertEquals(201, result.getCode());
         assertEquals("Promotion created successfully", result.getMessage());
         assertEquals(resp, result.getResult());
     }

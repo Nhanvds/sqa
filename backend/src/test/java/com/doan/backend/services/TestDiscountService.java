@@ -75,7 +75,7 @@ public class TestDiscountService {
 
         // Assert
         assertNotNull(response, "Response không được null");
-        assertEquals(200, response.getCode(), "Mã phản hồi phải là 200");
+        assertEquals(201, response.getCode(), "Mã phản hồi phải là 201");
         assertEquals("Discount created successfully", response.getMessage(), "Message phản hồi không đúng");
         assertEquals(discount, response.getResult(), "Discount trả về không khớp với mong đợi");
     }
@@ -116,7 +116,7 @@ public class TestDiscountService {
 
         // Assert
         assertNotNull(response, "Response không được null");
-        assertEquals(200, response.getCode(), "Mã phản hồi phải bằng 200");
+        assertEquals(201, response.getCode(), "Mã phản hồi phải bằng 201");
         assertEquals("Discount created successfully", response.getMessage(), "Message phản hồi không khớp");
         assertEquals(discount, response.getResult(), "Discount trả về không đúng");
     }

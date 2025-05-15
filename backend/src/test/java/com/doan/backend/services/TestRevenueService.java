@@ -152,7 +152,7 @@ public class TestRevenueService {
 
         // Act
         ApiResponse<List<CustomerRevenueResponse>> resp =
-                revenueService.getCustomerRevenue(LocalDate.now(), LocalDate.now());
+                revenueService.getCustomerRevenue(LocalDate.now(), LocalDate.now().plusMonths(1));
 
         // Assert
         assertEquals(200, resp.getCode());
