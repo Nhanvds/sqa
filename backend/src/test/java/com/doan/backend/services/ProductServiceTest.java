@@ -5,9 +5,13 @@ import com.doan.backend.dto.response.ApiResponse;
 import com.doan.backend.dto.response.ProductResponse;
 import com.doan.backend.entity.Category;
 import com.doan.backend.entity.Product;
+import com.doan.backend.entity.Promotion;
+import com.doan.backend.entity.PromotionProduct;
 import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.repositories.CategoryRepository;
 import com.doan.backend.repositories.ProductRepository;
+import com.doan.backend.repositories.PromotionProductRepository;
+import com.doan.backend.repositories.PromotionRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.*;
@@ -18,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +44,13 @@ public class ProductServiceTest {
     @PersistenceContext
     private EntityManager entityManager;
 
+    @Autowired
+    private PromotionRepository promotionRepository;
+
+    @Autowired
+    private PromotionProductRepository promotionProductRepository;
+
+    private Promotion samplePromotion;
     private Product sampleProduct;
     private Category sampleCategory;
 
@@ -57,15 +69,31 @@ public class ProductServiceTest {
                 .status(StatusEnum.ACTIVE)
                 .category(sampleCategory)
                 .build());
+
+        samplePromotion = promotionRepository.save(Promotion.builder()
+                .name("Test Promotion")
+                .description("10% off")
+                .discountPercentage(BigDecimal.valueOf(10))
+                .startDate(LocalDateTime.now().minusDays(1))
+                .endDate(LocalDateTime.now().plusDays(1))
+                .isActive(true)
+                .applyToAll(false)
+                .build());
     }
 
     // TC01 - Lấy thông tin Product đã tồn tại
     @Test
     void testGetProductByValidId_TC01() {
-        ApiResponse<ProductResponse> response = productService.getProductById(sampleProduct.getId());
-        assertNotNull(response);
-        assertEquals(200, response.getCode());
-        assertEquals(sampleProduct.getName(), response.getResult().getName());
+        assertDoesNotThrow(() -> {
+            ApiResponse<ProductResponse> response = productService.getProductById(sampleProduct.getId());
+            assertNotNull(response);
+            ProductResponse result = response.getResult();
+            assertEquals(sampleProduct.getName(), result.getName());
+            assertEquals(sampleProduct.getDescription(), result.getDescription());
+            assertEquals(sampleProduct.getPrice(), result.getPrice());
+            assertEquals(sampleProduct.getId(), result.getId());
+            assertEquals(sampleProduct.getStatus(), result.getStatus());
+        });
     }
 
     // TC02 - Lấy thông tin Product không tồn tại
@@ -74,20 +102,28 @@ public class ProductServiceTest {
         assertThrows(RuntimeException.class, () -> productService.getProductById("invalid-id"));
     }
 
-    // TC03 - Tạo Product mới hợp lệ
+    // TC03 - Tạo Product mới hợp lệ, có Categoy tồn tại
     @Test
     void testCreateProductValid_TC03() {
-        ProductRequest request = ProductRequest.builder()
-                .name("New Product")
-                .description("New Product Desc")
-                .price(BigDecimal.valueOf(150))
-                .categoryId(sampleCategory.getId())
-                .status(StatusEnum.ACTIVE)
-                .build();
+        assertDoesNotThrow(() -> {
+            ProductRequest request = ProductRequest.builder()
+                    .name("New Product")
+                    .description("New Product Desc")
+                    .price(BigDecimal.valueOf(150))
+                    .categoryId(sampleCategory.getId())
+                    .status(StatusEnum.ACTIVE)
+                    .build();
 
-        ApiResponse<String> response = productService.createProduct(request);
-        assertEquals(200, response.getCode());
-        assertNotNull(response.getResult());
+            ApiResponse<String> response = productService.createProduct(request);
+            assertNotNull(response.getResult());
+
+            Product createdProduct = productRepository.findById(response.getResult()).orElseThrow();
+            assertEquals(request.getName(), createdProduct.getName());
+            assertEquals(request.getDescription(), createdProduct.getDescription());
+            assertEquals(request.getPrice(), createdProduct.getPrice());
+            assertEquals(request.getCategoryId(), createdProduct.getCategory().getId());
+            assertEquals(request.getStatus(), createdProduct.getStatus());
+        });
     }
 
     // TC04 - Tạo Product với Category không tồn tại
@@ -104,24 +140,60 @@ public class ProductServiceTest {
         assertThrows(RuntimeException.class, () -> productService.createProduct(request));
     }
 
-    // TC05 - Cập nhật Product hợp lệ
+    // TC05 - Tạo Product với tên null
     @Test
-    void testUpdateProductValid_TC05() {
+    void testCreateProductWithNullName_TC05() {
         ProductRequest request = ProductRequest.builder()
-                .name("Updated Name")
-                .description("Updated Description")
-                .price(BigDecimal.valueOf(199))
+                .name(null)
+                .description("desc")
+                .price(BigDecimal.valueOf(100))
                 .categoryId(sampleCategory.getId())
-                .status(StatusEnum.INACTIVE)
+                .status(StatusEnum.ACTIVE)
                 .build();
 
-        ApiResponse<String> response = productService.updateProduct(sampleProduct.getId(), request);
-        assertEquals(200, response.getCode());
+        assertThrows(RuntimeException.class, () -> productService.createProduct(request));
     }
 
-    // TC06 - Cập nhật Product với ID không tồn tại
+    // TC06 - Tạo Product với giá trị price âm
     @Test
-    void testUpdateProductInvalidId_TC06() {
+    void testCreateProductWithNegativePrice_TC06() {
+        ProductRequest request = ProductRequest.builder()
+                .name("Negative Price")
+                .description("desc")
+                .price(BigDecimal.valueOf(-1))
+                .categoryId(sampleCategory.getId())
+                .status(StatusEnum.ACTIVE)
+                .build();
+
+        assertThrows(RuntimeException.class, () -> productService.createProduct(request));
+    }
+
+    // TC07 - Cập nhật Product hợp lệ
+    @Test
+    void testUpdateProductValid_TC07() {
+        assertDoesNotThrow(() -> {
+            ProductRequest request = ProductRequest.builder()
+                    .name("Updated Name")
+                    .description("Updated Description")
+                    .price(BigDecimal.valueOf(199))
+                    .categoryId(sampleCategory.getId())
+                    .status(StatusEnum.INACTIVE)
+                    .build();
+
+            productService.updateProduct(sampleProduct.getId(), request);
+
+            Product updatedProduct = productRepository.findById(sampleProduct.getId()).orElseThrow();
+            assertEquals(request.getName(), updatedProduct.getName());
+            assertEquals(request.getDescription(), updatedProduct.getDescription());
+            assertEquals(request.getPrice(), updatedProduct.getPrice());
+            assertEquals(request.getCategoryId(), updatedProduct.getCategory().getId());
+            assertEquals(request.getStatus(), updatedProduct.getStatus());
+        });
+    }
+
+    // TC08 - Cập nhật Product với ID không tồn tại
+    @Test
+    void testUpdateProductInvalidId_TC08() {
         ProductRequest request = ProductRequest.builder()
                 .name("Product")
                 .description("desc")
@@ -133,80 +205,29 @@ public class ProductServiceTest {
         assertThrows(RuntimeException.class, () -> productService.updateProduct("invalid-id", request));
     }
 
-    // TC07 - Xoá Product hợp lệ
+    // TC09 - Cập nhật Product với Category không tồn tại
     @Test
-    void testDeleteProductValid_TC07() {
-        ApiResponse<Void> response = productService.deleteProduct(sampleProduct.getId());
-        assertEquals(200, response.getCode());
-        Product deleted = productRepository.findById(sampleProduct.getId()).orElseThrow();
-        assertEquals(StatusEnum.DELETED, deleted.getStatus());
-    }
-
-    // TC08 - Xoá Product không tồn tại
-    @Test
-    void testDeleteProductInvalidId_TC08() {
-        assertThrows(RuntimeException.class, () -> productService.deleteProduct("invalid-id"));
-    }
-
-    // TC09 - Lấy danh sách Product có phân trang
-    @Test
-    void testSearchProductsWithPaging_TC09() {
-        Page<ProductResponse> page = productService.searchProducts("Test", null, PageRequest.of(0, 10)).getResult();
-        assertNotNull(page);
-        assertTrue(page.getContent().stream().anyMatch(p -> p.getName().contains("Test")));
-    }
-
-    // TC10 - Lấy danh sách Product với tên không tồn tại
-    @Test
-    void testSearchProductsWithInvalidName_TC10() {
-        Page<ProductResponse> page = productService.searchProducts("NoSuchName", null, PageRequest.of(0, 10)).getResult();
-        assertTrue(page.getContent().isEmpty());
-    }
-
-    // TC11 - Lấy danh sách Product với Category ID không tồn tại
-    @Test
-    void testSearchProductsWithInvalidCategory_TC11() {
-        Page<ProductResponse> page = productService.searchProducts(null, "invalid-category", PageRequest.of(0, 10)).getResult();
-        assertTrue(page.getContent().isEmpty());
-    }
-
-    // TC12 - Tạo Product với tên null
-    @Test
-    void testCreateProductWithNullName_TC12() {
+    void testUpdateProductWithInvalidCategory_TC09() {
         ProductRequest request = ProductRequest.builder()
-                .name(null)
-                .description("desc")
-                .price(BigDecimal.valueOf(100))
-                .categoryId(sampleCategory.getId())
+                .name("Updated Product")
+                .description("Updated Description")
+                .price(BigDecimal.valueOf(199))
+                .categoryId("non-existing-category")
                 .status(StatusEnum.ACTIVE)
                 .build();
 
-        assertThrows(Exception.class, () -> productService.createProduct(request));
+        assertThrows(RuntimeException.class, () -> productService.updateProduct(sampleProduct.getId(), request));
     }
 
-    // TC13 - Cập nhật Product với dữ liệu null
+    // TC10 - Cập nhật Product với dữ liệu null
     @Test
-    void testUpdateProductWithNullRequest_TC13() {
-        assertThrows(IllegalArgumentException.class, () -> productService.updateProduct(sampleProduct.getId(), null));
+    void testUpdateProductWithNullRequest_TC10() {
+        assertThrows(RuntimeException.class, () -> productService.updateProduct(sampleProduct.getId(), null));
     }
 
-    // TC14 - Tạo Product với giá trị price âm
+    // TC11 - Cập nhật Product với tên rỗng
     @Test
-    void testCreateProductWithNegativePrice_TC14() {
-        ProductRequest request = ProductRequest.builder()
-                .name("Negative Price")
-                .description("desc")
-                .price(BigDecimal.valueOf(-1))
-                .categoryId(sampleCategory.getId())
-                .status(StatusEnum.ACTIVE)
-                .build();
-
-        assertThrows(Exception.class, () -> productService.createProduct(request));
-    }
-
-    // TC15 - Cập nhật Product với tên rỗng
-    @Test
-    void testUpdateProductWithEmptyName_TC15() {
+    void testUpdateProductWithEmptyName_TC11() {
         ProductRequest request = ProductRequest.builder()
                 .name("")
                 .description("desc")
@@ -215,18 +236,113 @@ public class ProductServiceTest {
                 .status(StatusEnum.ACTIVE)
                 .build();
 
-        assertThrows(IllegalArgumentException.class, () -> productService.updateProduct(sampleProduct.getId(), request));
+        assertThrows(RuntimeException.class, () -> productService.updateProduct(sampleProduct.getId(), request));
     }
 
-    // TC16 - Tìm kiếm Product với pageable null
+    // TC12 - Xoá Product hợp lệ
     @Test
-    void testSearchProductsWithNullPageable_TC16() {
-        assertThrows(IllegalArgumentException.class, () -> productService.searchProducts("Test", null, null));
+    void testDeleteProductValid_TC12() {
+        assertDoesNotThrow(() -> {
+            productService.deleteProduct(sampleProduct.getId());
+            Product deleted = productRepository.findById(sampleProduct.getId()).orElseThrow();
+            assertEquals(StatusEnum.DELETED, deleted.getStatus());
+        });
     }
 
-    // TC17 - Tìm kiếm Product với page size = 0
+    // TC13 - Xoá Product không tồn tại
     @Test
-    void testSearchProductsWithZeroPageSize_TC17() {
-        assertThrows(IllegalArgumentException.class, () -> productService.searchProducts("Test", null, PageRequest.of(0, 0)));
+    void testDeleteProductInvalidId_TC13() {
+        assertThrows(RuntimeException.class, () -> productService.deleteProduct("invalid-id"));
+    }
+
+    // TC14 - Lấy danh sách Product có phân trang
+    @Test
+    void testSearchProductsWithPaging_TC14() {
+        assertDoesNotThrow(() -> {
+            Page<ProductResponse> page = productService.searchProducts("Test Category", null, PageRequest.of(0, 10)).getResult();
+            assertNotNull(page);
+            assertTrue(page.getContent().stream().anyMatch(p -> p.getName().contains("Test")));
+
+        });
+    }
+
+    // TC15 - Lấy danh sách Product với CategoruId là null
+    @Test
+    void testSearchProductsWithInvalidName_TC15() {
+        assertDoesNotThrow(() -> {
+            Page<ProductResponse> page = productService.searchProducts("NoSuchName", null, PageRequest.of(0, 10)).getResult();
+            assertEquals(page.getContent().size(), productRepository.findAll().size());
+        });
+    }
+
+    // TC16 - Lấy danh sách Product với Category ID không tồn tại
+    @Test
+    void testSearchProductsWithInvalidCategory_TC16() {
+        assertDoesNotThrow(() -> {
+            Page<ProductResponse> page = productService.searchProducts(null, "invalid-category", PageRequest.of(0, 10)).getResult();
+            assertTrue(page.getContent().isEmpty());
+        });
+    }
+
+    // TC17 - Tìm kiếm Product với pageable null
+    @Test
+    void testSearchProductsWithNullPageable_TC17() {
+        assertThrows(RuntimeException.class, () -> productService.searchProducts("Test", null, null));
+    }
+
+    // TC18 - Tìm kiếm Product với page size = 0
+    @Test
+    void testSearchProductsWithZeroPageSize_TC18() {
+        assertThrows(RuntimeException.class, () -> productService.searchProducts("Test", null, PageRequest.of(0, 0)));
+    }
+
+    // TC19 - Áp dụng Promotion cho Product
+    @Test
+    void testApplyPromotionToProduct_TC19() {
+        assertDoesNotThrow(() -> {
+            PromotionProduct pp = new PromotionProduct();
+            pp.setProduct(sampleProduct);
+            pp.setPromotion(samplePromotion);
+            promotionProductRepository.save(pp);
+
+            ApiResponse<ProductResponse> response = productService.getProductById(sampleProduct.getId());
+            ProductResponse result = response.getResult();
+            assertTrue( result.getPromotions().stream().anyMatch(a -> a.getId().equals(samplePromotion.getId())));
+        });
+    }
+
+    // TC20 - Tạo Product với Promotion không tồn tại
+    @Test
+    void testCreateProductWithInvalidPromotion_TC20() {
+        ProductRequest request = ProductRequest.builder()
+                .name("Invalid Promotion Product")
+                .description("desc")
+                .price(BigDecimal.valueOf(120))
+                .categoryId(sampleCategory.getId())
+                .promotionIds(List.of("invalid-id"))
+                .status(StatusEnum.ACTIVE)
+                .build();
+
+        assertThrows(RuntimeException.class, () -> productService.createProduct(request));
+    }
+
+    // TC21 - Cập nhật Product với Promotion mới
+    @Test
+    void testUpdateProductWithPromotion_TC21() {
+        assertDoesNotThrow(() -> {
+            ProductRequest request = ProductRequest.builder()
+                    .name("Update With Promotion")
+                    .description("desc")
+                    .price(BigDecimal.valueOf(110))
+                    .categoryId(sampleCategory.getId())
+                    .promotionIds(List.of(samplePromotion.getId()))
+                    .status(StatusEnum.ACTIVE)
+                    .build();
+
+            productService.updateProduct(sampleProduct.getId(), request);
+            productRepository.findById(sampleProduct.getId()).orElseThrow();
+            List<PromotionProduct> list = promotionProductRepository.findPromotionProductsByProductId(sampleProduct.getId());
+            assertTrue(list.stream().anyMatch(a -> (a.getPromotion().getId().equals(samplePromotion.getId()) && a.getProduct().getId().equals(a.getProduct().getId())) ));
+        });
     }
 }

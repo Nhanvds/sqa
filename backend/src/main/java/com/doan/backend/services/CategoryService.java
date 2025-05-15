@@ -23,6 +23,43 @@ public class CategoryService {
     CategoryMapper categoryMapper;
     CategoryRepository categoryRepository;
 
+    public ApiResponse<CategoryResponse> getCategory(String id) {
+        Optional<Category> categoryOptional = categoryRepository.findById(id);
+
+        if (categoryOptional.isPresent()) {
+            return ApiResponse.<CategoryResponse>builder()
+                    .code(200)
+                    .message("Category retrieved successfully")
+                    .result(categoryMapper.toCategoryResponse(categoryOptional.get()))
+                    .build();
+        } else {
+            throw new RuntimeException("Category not found");
+        }
+    }
+
+    public ApiResponse<List<CategoryResponse>> getAllCategories() {
+        List<Category> categories = categoryRepository.findByStatusNot(StatusEnum.DELETED);
+        return ApiResponse.<List<CategoryResponse>>builder()
+                .code(200)
+                .message("Categories retrieved successfully")
+                .result(categoryMapper.toCategoryResponseList(categories))
+                .build();
+    }
+
+
+    public ApiResponse<Page<CategoryResponse>> getPageAllCategories(String name, Pageable pageable) {
+        Page<Category> categoryPage = categoryRepository.findByNameContainingIgnoreCaseAndStatusNot(name, StatusEnum.DELETED, pageable);
+
+        Page<CategoryResponse> categoryResponsePage = categoryPage.map(categoryMapper::toCategoryResponse);
+
+        return ApiResponse.<Page<CategoryResponse>>builder()
+                .code(200)
+                .message("Categories retrieved successfully")
+                .result(categoryResponsePage)
+                .build();
+    }
+
+
     public ApiResponse<String> deleteCategory(String id) {
         Category category = categoryRepository.findById(id).orElseThrow(() -> new RuntimeException("Category not found"));
 
@@ -74,38 +111,5 @@ public class CategoryService {
         }
     }
 
-    public ApiResponse<List<CategoryResponse>> getAllCategories() {
-        List<Category> categories = categoryRepository.findByStatusNot(StatusEnum.DELETED);
-        return ApiResponse.<List<CategoryResponse>>builder()
-                .code(200)
-                .message("Categories retrieved successfully")
-                .result(categoryMapper.toCategoryResponseList(categories))
-                .build();
-    }
 
-    public ApiResponse<CategoryResponse> getCategory(String id) {
-        Optional<Category> categoryOptional = categoryRepository.findById(id);
-
-        if (categoryOptional.isPresent()) {
-            return ApiResponse.<CategoryResponse>builder()
-                    .code(200)
-                    .message("Category retrieved successfully")
-                    .result(categoryMapper.toCategoryResponse(categoryOptional.get()))
-                    .build();
-        } else {
-            throw new RuntimeException("Category not found");
-        }
-    }
-
-    public ApiResponse<Page<CategoryResponse>> getPageAllCategories(String name, Pageable pageable) {
-        Page<Category> categoryPage = categoryRepository.findByNameContainingIgnoreCaseAndStatusNot(name, StatusEnum.DELETED, pageable);
-
-        Page<CategoryResponse> categoryResponsePage = categoryPage.map(categoryMapper::toCategoryResponse);
-
-        return ApiResponse.<Page<CategoryResponse>>builder()
-                .code(200)
-                .message("Categories retrieved successfully")
-                .result(categoryResponsePage)
-                .build();
-    }
 }

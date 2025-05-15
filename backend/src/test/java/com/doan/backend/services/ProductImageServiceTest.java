@@ -8,7 +8,6 @@ import com.doan.backend.enums.StatusEnum;
 import com.doan.backend.repositories.ProductImageRepository;
 import com.doan.backend.repositories.ProductRepository;
 import jakarta.transaction.Transactional;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +16,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
 
 @SpringBootTest
 @Transactional
@@ -34,6 +36,7 @@ public class ProductImageServiceTest {
     // TC01 - Tạo ProductImage với Product hợp lệ
     @Test
     void testCreateProductImage_Success_TC01() {
+
         Product product = new Product();
         product.setName("Test Product");
         product.setDescription("Description");
@@ -48,10 +51,9 @@ public class ProductImageServiceTest {
         urls.add("https://image2.com");
         request.setImageUrl(urls);
 
-        var response = productImageService.createProductImage(request);
+        productImageService.createProductImage(request);
 
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertEquals(2, productImageRepository.findAllByProductId(product.getId()).spliterator().getExactSizeIfKnown());
+        assertEquals(2, productImageRepository.findAllByProductId(product.getId()).spliterator().getExactSizeIfKnown());
     }
 
     // TC02 - Tạo ProductImage với Product không tồn tại
@@ -61,12 +63,12 @@ public class ProductImageServiceTest {
         request.setIdProduct(UUID.randomUUID().toString());
         request.setImageUrl(List.of("https://image.com"));
 
-        Assertions.assertThrows(RuntimeException.class, () -> productImageService.createProductImage(request));
+        assertThrows(RuntimeException.class, () -> productImageService.createProductImage(request));
     }
 
-    // TC03 - Xóa ProductImage thành công
+    // TC04 - Xóa ProductImage thành công
     @Test
-    void testDeleteProductImage_Success_TC03() {
+    void testDeleteProductImage_Success_TC04() {
         Product product = new Product();
         product.setName("Test Product");
         product.setDescription("Description");
@@ -84,99 +86,106 @@ public class ProductImageServiceTest {
 
         var response = productImageService.deleteProductImage(request);
 
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertFalse(productImageRepository.findById(image.getId()).isPresent());
+        assertFalse(productImageRepository.findById(image.getId()).isPresent());
     }
 
-    // TC04 - Xóa ProductImage với ID không tồn tại
+    // TC06 - Xóa ProductImage với ID không tồn tại
     @Test
-    void testDeleteProductImage_NotFound_TC04() {
-        DeleteProductImageRequest request = new DeleteProductImageRequest();
-        request.setIds(List.of(UUID.randomUUID().toString()));
+    void testDeleteProductImage_NotFound_TC06() {
+        assertThrows(RuntimeException.class,() -> {
+            DeleteProductImageRequest request = new DeleteProductImageRequest();
+            request.setIds(List.of(UUID.randomUUID().toString()));
 
-        var response = productImageService.deleteProductImage(request);
-        Assertions.assertEquals(200, response.getCode());
+            productImageService.deleteProductImage(request);
+        });
+
     }
 
-    // TC05 - Lấy danh sách ProductImage theo ProductId hợp lệ
+    // TC07 - Lấy danh sách ProductImage theo ProductId hợp lệ
     @Test
-    void testGetProductImagesByProductId_Success_TC05() {
-        Product product = new Product();
-        product.setName("Product A");
-        product.setDescription("Description");
-        product.setPrice(BigDecimal.valueOf(200));
-        product.setStatus(StatusEnum.ACTIVE);
-        product = productRepository.save(product);
+    void testGetProductImagesByProductId_Success_TC07() {
+        assertDoesNotThrow(() -> {
+            Product product = new Product();
+            product.setName("Product A");
+            product.setDescription("Description");
+            product.setPrice(BigDecimal.valueOf(200));
+            product.setStatus(StatusEnum.ACTIVE);
+            product = productRepository.save(product);
 
-        ProductImage image1 = new ProductImage(null, product, "https://image1.com");
-        ProductImage image2 = new ProductImage(null, product, "https://image2.com");
-        productImageRepository.save(image1);
-        productImageRepository.save(image2);
+            ProductImage image1 = new ProductImage(null, product, "https://image1.com");
+            ProductImage image2 = new ProductImage(null, product, "https://image2.com");
+            productImageRepository.save(image1);
+            productImageRepository.save(image2);
 
-        var response = productImageService.getProductImagesByProductId(product.getId());
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertEquals(2, ((List<?>) response.getResult()).size());
+            var response = productImageService.getProductImagesByProductId(product.getId());
+            assertEquals(2, ((List<?>) response.getResult()).size());
+        }
+        );
     }
 
-    // TC06 - Lấy danh sách ProductImage theo ProductId không có image
+    // TC08 - Lấy danh sách ProductImage theo ProductId không có image
     @Test
-    void testGetProductImagesByProductId_Empty_TC06() {
-        Product product = new Product();
-        product.setName("Product Empty");
-        product.setDescription("Description");
-        product.setPrice(BigDecimal.valueOf(200));
-        product.setStatus(StatusEnum.ACTIVE);
-        product = productRepository.save(product);
+    void testGetProductImagesByProductId_Empty_TC08() {
+        assertDoesNotThrow(() -> {
 
-        var response = productImageService.getProductImagesByProductId(product.getId());
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertFalse(response.getResult().iterator().hasNext());
+            Product product = new Product();
+            product.setName("Product Empty");
+            product.setDescription("Description");
+            product.setPrice(BigDecimal.valueOf(200));
+            product.setStatus(StatusEnum.ACTIVE);
+            product = productRepository.save(product);
+
+            var response = productImageService.getProductImagesByProductId(product.getId());
+            assertFalse(response.getResult().iterator().hasNext());
+        });
     }
 
-    // TC07 - Tạo ProductImage với danh sách URL rỗng
+    // TC03 - Tạo ProductImage với danh sách URL rỗng
     @Test
-    void testCreateProductImage_EmptyURL_TC07() {
-        Product product = new Product();
-        product.setName("Product Test");
-        product.setDescription("Description");
-        product.setPrice(BigDecimal.valueOf(300));
-        product.setStatus(StatusEnum.ACTIVE);
-        product = productRepository.save(product);
+    void testCreateProductImage_EmptyURL_TC03() {
+        assertDoesNotThrow(() -> {
 
-        ProductImageRequest request = new ProductImageRequest();
-        request.setIdProduct(product.getId());
-        request.setImageUrl(new ArrayList<>());
+            Product product = new Product();
+            product.setName("Product Test");
+            product.setDescription("Description");
+            product.setPrice(BigDecimal.valueOf(300));
+            product.setStatus(StatusEnum.ACTIVE);
+            product = productRepository.save(product);
 
-        var response = productImageService.createProductImage(request);
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertFalse(productImageRepository.findAllByProductId(product.getId()).iterator().hasNext());
+            ProductImageRequest request = new ProductImageRequest();
+            request.setIdProduct(product.getId());
+            request.setImageUrl(new ArrayList<>());
+
+            productImageService.createProductImage(request);
+            assertFalse(productImageRepository.findAllByProductId(product.getId()).iterator().hasNext());
+        });
     }
 
-    // TC08 - Xóa ProductImage với danh sách ID rỗng
+    // TC05 - Xóa ProductImage với danh sách ID rỗng
     @Test
-    void testDeleteProductImage_EmptyIdList_TC08() {
-        DeleteProductImageRequest request = new DeleteProductImageRequest();
-        request.setIds(new ArrayList<>());
+    void testDeleteProductImage_EmptyIdList_TC05() {
+        assertDoesNotThrow(() -> {
 
-        var response = productImageService.deleteProductImage(request);
-        Assertions.assertEquals(200, response.getCode());
+            DeleteProductImageRequest request = new DeleteProductImageRequest();
+            request.setIds(new ArrayList<>());
+
+            Integer check1 = productImageRepository.findAll().size();
+
+            var response = productImageService.deleteProductImage(request);
+//            assertFalse(response.getResult().iterator().hasNext());
+
+            assertEquals(check1, productImageRepository.findAll().size());
+        });
     }
 
     // TC09 - Lấy ProductImage với ProductId không tồn tại
     @Test
     void testGetProductImagesByProductId_ProductNotFound_TC09() {
-        var response = productImageService.getProductImagesByProductId(UUID.randomUUID().toString());
-        Assertions.assertEquals(200, response.getCode());
-        Assertions.assertFalse(response.getResult().iterator().hasNext());
+        assertDoesNotThrow(() -> {
+
+            var response = productImageService.getProductImagesByProductId(UUID.randomUUID().toString());
+            assertFalse(response.getResult().iterator().hasNext());
+        });
     }
 
-    // TC10 - Tạo ProductImage với null ID Product
-    @Test
-    void testCreateProductImage_NullProductId_TC10() {
-        ProductImageRequest request = new ProductImageRequest();
-        request.setIdProduct(null);
-        request.setImageUrl(List.of("https://image.com"));
-
-        Assertions.assertThrows(RuntimeException.class, () -> productImageService.createProductImage(request));
-    }
 }

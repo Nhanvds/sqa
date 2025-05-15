@@ -38,27 +38,24 @@ public class ProductService {
     PromotionRepository promotionRepository;
     PromotionProductRepository promotionProductRepository;
 
-    private void savePromotionProducts(Product product, List<String> promotionIds) {
-        Optional<Promotion> existingPromotion = promotionProductRepository.findActivePromotionByProductId(product.getId(), LocalDateTime.now());
-        if (existingPromotion.isPresent()) {
-            throw new RuntimeException("An active promotion already exists for this product.");
-        }
 
-        if (promotionIds != null && !promotionIds.isEmpty()) {
-            List<PromotionProduct> promotionProducts = new ArrayList<>();
+    public ApiResponse<ProductResponse> getProductById(String id) {
+        ProductResponse productResponse = productRepository.findByIdAndStatusNot(id, StatusEnum.DELETED)
+                .map(productMapper::toProductResponse)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
 
-            for (String promotionId : promotionIds) {
-                Promotion promotion = promotionRepository.findById(promotionId)
-                        .orElseThrow(() -> new RuntimeException("Promotion not found"));
+        Optional<Promotion> promotionOptional = promotionProductRepository.findActivePromotionByProductId(id, LocalDateTime.now());
 
-                PromotionProduct promotionProduct = new PromotionProduct();
-                promotionProduct.setPromotion(promotion);
-                promotionProduct.setProduct(product);
-                promotionProducts.add(promotionProduct);
-            }
+        productResponse.setDiscountPercentage(
+                promotionOptional.map(Promotion::getDiscountPercentage).orElse(BigDecimal.ZERO)
+        );
 
-            promotionProductRepository.saveAll(promotionProducts);
-        }
+        return ApiResponse.<ProductResponse>builder()
+                .code(200)
+                .message("Product retrieved successfully")
+                .result(productResponse)
+
+                .build();
     }
 
     public ApiResponse<String> createProduct(ProductRequest productRequest) {
@@ -69,6 +66,18 @@ public class ProductService {
                 .code(200)
                 .result(productSave.getId())
                 .message("Product created successfully")
+                .build();
+    }
+
+
+    public ApiResponse<Void> deleteProduct(String id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+        product.setStatus(StatusEnum.DELETED);
+        productRepository.save(product);
+        return ApiResponse.<Void>builder()
+                .code(200)
+                .message("Product deleted successfully")
                 .build();
     }
 
@@ -95,35 +104,6 @@ public class ProductService {
                 .code(200)
                 .result(product.getId())
                 .message("Product updated successfully")
-                .build();
-    }
-
-    public ApiResponse<Void> deleteProduct(String id) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-        product.setStatus(StatusEnum.DELETED);
-        productRepository.save(product);
-        return ApiResponse.<Void>builder()
-                .code(200)
-                .message("Product deleted successfully")
-                .build();
-    }
-
-    public ApiResponse<ProductResponse> getProductById(String id) {
-        ProductResponse productResponse = productRepository.findByIdAndStatusNot(id, StatusEnum.DELETED)
-                .map(productMapper::toProductResponse)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
-
-        Optional<Promotion> promotionOptional = promotionProductRepository.findActivePromotionByProductId(id, LocalDateTime.now());
-
-        productResponse.setDiscountPercentage(
-                promotionOptional.map(Promotion::getDiscountPercentage).orElse(BigDecimal.ZERO)
-        );
-
-        return ApiResponse.<ProductResponse>builder()
-                .code(200)
-                .message("Product retrieved successfully")
-                .result(productResponse)
                 .build();
     }
 
@@ -161,4 +141,32 @@ public class ProductService {
                 .result(productResponsePage)
                 .build();
     }
+
+    private void savePromotionProducts(Product product, List<String> promotionIds) {
+        Optional<Promotion> existingPromotion = promotionProductRepository.findActivePromotionByProductId(product.getId(), LocalDateTime.now());
+        if (existingPromotion.isPresent()) {
+            throw new RuntimeException("An active promotion already exists for this product.");
+        }
+
+        if (promotionIds != null && !promotionIds.isEmpty()) {
+            List<PromotionProduct> promotionProducts = new ArrayList<>();
+
+            for (String promotionId : promotionIds) {
+                Promotion promotion = promotionRepository.findById(promotionId)
+                        .orElseThrow(() -> new RuntimeException("Promotion not found"));
+
+                PromotionProduct promotionProduct = new PromotionProduct();
+                promotionProduct.setPromotion(promotion);
+                promotionProduct.setProduct(product);
+                promotionProducts.add(promotionProduct);
+            }
+
+            promotionProductRepository.saveAll(promotionProducts);
+        }
+    }
+
+
+
+
+
 }
